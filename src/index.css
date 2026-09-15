@@ -1,0 +1,202 @@
+/* src/index.css — AI Student Tracker web dashboard
+   Official DLU (Dai hoc Da Lat) brand identity — Dark Slate Theme
+   Background chính: #141820
+   Surface / Card: #1E2430
+   Primary Accent: DLU Green #9ABE26
+   Secondary Accent: DLU Orange #FFA12D
+   Cảnh báo / Unattended: DLU Red #E2231A
+   Text Primary: #E6E8EC
+*/
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+:root {
+  /* ---- DLU brand raw colors ---- */
+  --dlu-green: #9ABE26;
+  --dlu-orange: #FFA12D;
+  --dlu-yellow: #FFC600;
+  --dlu-warm-grey: #404B5E;
+  --dlu-red: #E2231A;
+
+  /* ---- Semantic Dark Slate UI tokens ---- */
+  --background: #141820;
+  --background-alt: #10141B;
+  --foreground: #E6E8EC;
+
+  --card: #1E2430;
+  --card-foreground: #E6E8EC;
+
+  --muted: #262E3D;
+  --muted-foreground: #94A3B8;
+
+  --primary: var(--dlu-green);
+  --primary-foreground: #141820;
+  --secondary: var(--dlu-orange);
+  --secondary-foreground: #141820;
+  --accent: var(--dlu-green);
+  --accent-foreground: #141820;
+  --ring: var(--dlu-green);
+
+  --border: #2B3545;
+  --border-subtle: #222B38;
+
+  /* ---- Status colors (Business logic) ---- */
+  --connected: #9ABE26;
+  --offline: #E2231A;
+  --waiting-color: #FFA12D;
+
+  --video-background: #0E1117;
+  --video-overlay: #07090C;
+}
+
+html.light,
+.light {
+  /* Crisp, non-glare DLU Light Theme */
+  --background: #F8FAFC;
+  --background-alt: #EDF2F7;
+  --foreground: #0F172A;
+
+  --card: #FFFFFF;
+  --card-foreground: #0F172A;
+
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
+
+  --primary: #85A81A;
+  --primary-foreground: #FFFFFF;
+  --secondary: #E88916;
+  --secondary-foreground: #FFFFFF;
+  --accent: #85A81A;
+  --accent-foreground: #FFFFFF;
+  --ring: #85A81A;
+
+  --border: #E2E8F0;
+  --border-subtle: #F1F5F9;
+
+  --connected: #85A81A;
+  --offline: #DC2626;
+  --waiting-color: #E88916;
+
+  --video-background: #1E293B;
+  --video-overlay: #0F172A;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-background-alt: var(--background-alt);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-ring: var(--ring);
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-connected: var(--connected);
+  --color-offline: var(--offline);
+  --color-waiting-color: var(--waiting-color);
+  --color-video-background: var(--video-background);
+  --color-video-overlay: var(--video-overlay);
+
+  /* DLU brand raw colors */
+  --color-dlu-green: var(--dlu-green);
+  --color-dlu-orange: var(--dlu-orange);
+  --color-dlu-yellow: var(--dlu-yellow);
+  --color-dlu-warm-grey: var(--dlu-warm-grey);
+  --color-dlu-red: var(--dlu-red);
+
+  --font-display: 'Inter', sans-serif;
+  --font-body: 'Be Vietnam Pro', sans-serif;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: 'Be Vietnam Pro', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* Custom dark scrollbar */
+  ::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #141820;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #2D3748;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #4A5568;
+  }
+}
+
+@layer utilities {
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse-subtle {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.2s ease-out forwards;
+  }
+
+  .animate-skeleton {
+    animation: pulse-subtle 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .focus-ring {
+    outline: none;
+  }
+
+  .focus-ring:focus-visible {
+    box-shadow: 0 0 0 2px var(--ring);
+  }
+
+  .page-title-accent {
+    display: inline-block;
+    width: 36px;
+    height: 3px;
+    border-radius: 2px;
+    background-color: var(--dlu-green);
+    margin-top: 4px;
+  }
+}

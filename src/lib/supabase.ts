@@ -1,0 +1,317 @@
+// src/lib/supabase.ts
+// Supabase Client and Database Operations for TrackingZ DLU Web Admin.
+import { createClient, type SupabaseClient, type RealtimeChannel } from "@supabase/supabase-js";
+import { getCloudConfig } from "./config";
+import { STUDENT_DIRECTORY, VISIT_RECORDS } from "../data/mockData";
+import type { VisitRecord, StudentSummary, VisitStatus } from "../data/types";
+
+let cachedClient: SupabaseClient | null = null;
+let currentConfigKey = "";
+
+export function getSupabaseClient(): SupabaseClient | null {
+  const config = getCloudConfig();
+  const key = `${config.supabaseUrl}_${config.supabaseAnonKey}`;
+
+  if (!config.supabaseUrl || !config.supabaseAnonKey) {
+    return null;
+  }
+
+  if (cachedClient && currentConfigKey === key) {
+    return cachedClient;
+  }
+
+  try {
+    cachedClient = createClient(config.supabaseUrl, config.supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+    });
+    currentConfigKey = key;
+    return cachedClient;
+  } catch (err) {
+    console.error("Failed to initialize Supabase client:", err);
+    return null;
+  }
+}
+
+// Local in-memory store for fallback/demo when Supabase is not connected
+let localStudents: StudentSummary[] = [...STUDENT_DIRECTORY];
+let localRecords: VisitRecord[] = [...VISIT_RECORDS];
+
+export interface StudentDBRecord {
+  student_id: string;
+  full_name: string;
+  class_name?: string;
+  email?: string;
+  portrait_url?: string;
+  created_at?: string;
+}
+
+export interface VisitDBRecord {
+  id: number | string;
+  track_id: number;
+  student_id: string | null;
+  student_name: string;
+  time_in: string;
+  time_out?: string | null;
+  duration_seconds?: number;
+  status: VisitStatus;
+  snapshot_url?: string;
+  best_crop?: string;
+  camera_id?: string;
+  created_at?: string;
+}
+
+/**
+ * Fetch all students from Supabase (or local fallback)
+ */
+export async function fetchStudents(): Promise<StudentSummary[]> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return [...localStudents];
+  }
+
+  try {
+    const { data, error } = await client
+      .from("students")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error || !data || data.length === 0) {
+      if (error) console.warn("Supabase fetchStudents warning:", error.message);
+      return [...localStudents];
+    }
+
+    // Map DB schema to UI StudentSummary
+    return data.map((d: any) => {
+      const matchHistory = localRecords.filter((r) => r.studentId === d.student_id);
+      const servedCount = matchHistory.filter((r) => r.status === "Served").length;
+      return {
+        studentId: d.student_id,
+        name: d.full_name,
+        className: d.class_name || "CNTT",
+        totalVisits: matchHistory.length,
+        servedCount,
+        avgWaitSecs: 180,
+        lastSeen: d.created_at || new Date().toISOString(),
+        lastCameraId: "CAM-01",
+        currentlyInArea: false,
+        portraitUrl: d.portrait_url,
+      } as StudentSummary & { portraitUrl?: string };
+    });
+  } catch (err) {
+    console.warn("fetchStudents error, falling back to local:", err);
+    return [...localStudents];
+  }
+}
+
+/**
+ * Insert or Update a student record
+ */
+export async function upsertStudent(student: {
+  student_id: string;
+  full_name: string;
+  class_name: string;
+  email: string;
+  portrait_url: string;
+}): Promise<{ success: boolean; error?: string }> {
+  // Update local store
+  const existingIdx = localStudents.findIndex((s) => s.studentId === student.student_id);
+  const updatedItem: any = {
+    studentId: student.student_id,
+    name: student.full_name,
+    className: student.class_name,
+    totalVisits: existingIdx >= 0 ? localStudents[existingIdx].totalVisits : 0,
+    servedCount: existingIdx >= 0 ? localStudents[existingIdx].servedCount : 0,
+    avgWaitSecs: existingIdx >= 0 ? localStudents[existingIdx].avgWaitSecs : 0,
+    lastSeen: new Date().toISOString(),
+    lastCameraId: "CAM-01",
+    currentlyInArea: false,
+    portraitUrl: student.portrait_url,
+  };
+
+  if (existingIdx >= 0) {
+    localStudents[existingIdx] = { ...localStudents[existingIdx], ...updatedItem };
+  } else {
+    localStudents.unshift(updatedItem);
+  }
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: true };
+  }
+
+  try {
+    const { error } = await client.from("students").upsert({
+      student_id: student.student_id,
+      full_name: student.full_name,
+      class_name: student.class_name,
+      email: student.email,
+      portrait_url: student.portrait_url,
+    });
+
+    if (error) {
+      console.error("Supabase upsertStudent error:", error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Delete a student and clean up all associated records (Cascade cleanup).
+ */
+export async function deleteStudentCascade(studentId: string): Promise<{ success: boolean; error?: string }> {
+  // 1. Clean local state
+  localStudents = localStudents.filter((s) => s.studentId !== studentId);
+  localRecords = localRecords.filter((r) => r.studentId !== studentId);
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: true };
+  }
+
+  try {
+    // Clean dependent records in student_records if foreign key ON DELETE SET NULL or CASCADE isn't automatic
+    await client.from("student_records").delete().eq("student_id", studentId);
+
+    // Delete student
+    const { error } = await client.from("students").delete().eq("student_id", studentId);
+
+    if (error) {
+      console.error("Supabase deleteStudent error:", error);
+      return { success: false, error: error.message };
+    }
+
+    try {
+      // Invoke edge function to delete Cloudinary image if it exists
+      await client.functions.invoke("delete-cloudinary-image", {
+        body: { student_id: studentId }
+      });
+    } catch (edgeErr) {
+      console.warn("Could not delete Cloudinary image (Edge function might not exist yet):", edgeErr);
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Fetch all student visits / records
+ */
+export async function fetchVisitRecords(): Promise<VisitRecord[]> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return [...localRecords];
+  }
+
+  try {
+    const { data, error } = await client
+      .from("student_records")
+      .select("*")
+      .order("time_in", { ascending: false });
+
+    if (error || !data || data.length === 0) {
+      return [...localRecords];
+    }
+
+    return data.map((d: any) => {
+      // Normalize status to 3 standard types: Served, Waiting, Unattended
+      let status: VisitStatus = "Waiting";
+      const s = (d.status || "").toUpperCase();
+      if (s === "SERVED" || s === "COMPLETED") status = "Served";
+      else if (s === "UNATTENDED" || s === "ABANDONED") status = "Unattended";
+
+      const timeIn = d.time_in || d.created_at || new Date().toISOString();
+      const enteredMs = new Date(timeIn).getTime();
+      const exitedMs = d.time_out ? new Date(d.time_out).getTime() : Date.now();
+      const durSecs = Math.max(0, Math.round((exitedMs - enteredMs) / 1000));
+
+      const matchingStudent = localStudents.find((s) => s.studentId === d.student_id);
+      const studentClass = matchingStudent ? matchingStudent.className : (d.class_name || "CTK44");
+
+      return {
+        id: String(d.id),
+        studentId: d.student_id || `TRK-${d.track_id}`,
+        studentName: d.student_name || "Không rõ mặt",
+        className: studentClass,
+        status,
+        cameraId: d.camera_id || "CAM-01",
+        enteredAt: timeIn,
+        exitedAt: d.time_out || undefined,
+        durationSeconds: d.duration_seconds || durSecs,
+        waitSeconds: durSecs > 180 ? 180 : durSecs,
+        snapshotUrl: d.snapshot_url,
+        bestCrop: d.best_crop || d.snapshot_url,
+      } as VisitRecord & { snapshotUrl?: string; bestCrop?: string };
+    });
+  } catch (err) {
+    console.warn("fetchVisitRecords error, falling back:", err);
+    return [...localRecords];
+  }
+}
+
+/**
+ * Dynamically extract distinct classes from Supabase & local students
+ */
+export async function fetchDistinctClasses(): Promise<string[]> {
+  const defaultClasses = ["CTK41", "CTK42", "CTK43", "CTK44", "CTK45"];
+  const client = getSupabaseClient();
+
+  if (!client) {
+    const fromLocal = localStudents.map((s) => s.className).filter(Boolean);
+    return Array.from(new Set([...defaultClasses, ...fromLocal])).sort();
+  }
+
+  try {
+    const { data, error } = await client.from("students").select("class_name");
+    if (error || !data) {
+      const fromLocal = localStudents.map((s) => s.className).filter(Boolean);
+      return Array.from(new Set([...defaultClasses, ...fromLocal])).sort();
+    }
+    const fromDb = data.map((d: any) => d.class_name).filter(Boolean);
+    return Array.from(new Set([...defaultClasses, ...fromDb])).sort();
+  } catch {
+    return defaultClasses;
+  }
+}
+
+/**
+ * Realtime Subscription listener for student_records table.
+ * Automatically receives INSERT, UPDATE, DELETE events without F5 page reloads.
+ */
+export function subscribeToStudentRecords(
+  onRecordChange: (payload: any) => void
+): { unsubscribe: () => void } {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { unsubscribe: () => {} };
+  }
+
+  try {
+    const channel: RealtimeChannel = client
+      .channel("student_records_realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "student_records" },
+        (payload) => {
+          onRecordChange(payload);
+        }
+      )
+      .subscribe();
+
+    return {
+      unsubscribe: () => {
+        client.removeChannel(channel);
+      },
+    };
+  } catch (err) {
+    console.error("Failed to subscribe to realtime student_records:", err);
+    return { unsubscribe: () => {} };
+  }
+}
