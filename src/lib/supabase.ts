@@ -2,8 +2,7 @@
 // Supabase Client and Database Operations for TrackingZ DLU Web Admin.
 import { createClient, type SupabaseClient, type RealtimeChannel } from "@supabase/supabase-js";
 import { getCloudConfig } from "./config";
-import { STUDENT_DIRECTORY, VISIT_RECORDS } from "../data/mockData";
-import type { VisitRecord, StudentSummary, VisitStatus } from "../data/types";
+import type { VisitRecord, StudentSummary, VisitStatus, CameraOption } from "../data/types";
 
 let cachedClient: SupabaseClient | null = null;
 let currentConfigKey = "";
@@ -36,8 +35,8 @@ export function getSupabaseClient(): SupabaseClient | null {
 }
 
 // Local in-memory store for fallback/demo when Supabase is not connected
-let localStudents: StudentSummary[] = [...STUDENT_DIRECTORY];
-let localRecords: VisitRecord[] = [...VISIT_RECORDS];
+let localStudents: StudentSummary[] = [];
+let localRecords: VisitRecord[] = [];
 
 export interface StudentDBRecord {
   student_id: string;
@@ -175,10 +174,27 @@ export async function deleteStudentCascade(studentId: string): Promise<{ success
   }
 
   try {
-    // Clean dependent records in student_records if foreign key ON DELETE SET NULL or CASCADE isn't automatic
+    // 1. Fetch the student's portrait_url before deleting
+    const { data: st } = await client.from("students").select("portrait_url").eq("student_id", studentId).single();
+    let publicId = null;
+    
+    if (st?.portrait_url) {
+      // Extract public_id from Cloudinary URL
+      // Example: https://res.cloudinary.com/xyz/image/upload/v1234/folder/file.jpg -> folder/file
+      const parts = st.portrait_url.split("/upload/");
+      if (parts.length > 1) {
+        let path = parts[1];
+        if (path.match(/^v\d+\//)) path = path.replace(/^v\d+\//, "");
+        const dotIndex = path.lastIndexOf(".");
+        if (dotIndex !== -1) path = path.substring(0, dotIndex);
+        publicId = path;
+      }
+    }
+
+    // 2. Clean dependent records
     await client.from("student_records").delete().eq("student_id", studentId);
 
-    // Delete student
+    // 3. Delete student
     const { error } = await client.from("students").delete().eq("student_id", studentId);
 
     if (error) {
@@ -186,13 +202,15 @@ export async function deleteStudentCascade(studentId: string): Promise<{ success
       return { success: false, error: error.message };
     }
 
-    try {
-      // Invoke edge function to delete Cloudinary image if it exists
-      await client.functions.invoke("delete-cloudinary-image", {
-        body: { student_id: studentId }
-      });
-    } catch (edgeErr) {
-      console.warn("Could not delete Cloudinary image (Edge function might not exist yet):", edgeErr);
+    // 4. Delete Cloudinary image using Edge Function if we have a public_id
+    if (publicId) {
+      try {
+        await client.functions.invoke("delete-cloudinary-image", {
+          body: { public_id: publicId }
+        });
+      } catch (edgeErr) {
+        console.warn("Could not delete Cloudinary image:", edgeErr);
+      }
     }
 
     return { success: true };
@@ -278,6 +296,37 @@ export async function fetchDistinctClasses(): Promise<string[]> {
     return Array.from(new Set([...defaultClasses, ...fromDb])).sort();
   } catch {
     return defaultClasses;
+  }
+}
+
+
+
+/**
+ * Dynamically extract distinct camera IDs from student_records
+ */
+export async function fetchDistinctCameras(): Promise<CameraOption[]> {
+  const defaultCameras: CameraOption[] = [{ id: "CAM-01", label: "Camera 01", fps: 30, status: "Connected" }];
+  const client = getSupabaseClient();
+  
+  if (!client) return defaultCameras;
+
+  try {
+    const { data, error } = await client.from("student_records").select("camera_id");
+    if (error || !data) return defaultCameras;
+    
+    const fromDb = data.map((d: any) => d.camera_id).filter(Boolean);
+    const unique = Array.from(new Set(fromDb)).sort() as string[];
+    
+    if (unique.length === 0) return defaultCameras;
+    
+    return unique.map(id => ({ 
+      id, 
+      label: `Camera ${id.replace("CAM-", "")}`,
+      fps: 30,
+      status: "Connected"
+    }));
+  } catch {
+    return defaultCameras;
   }
 }
 

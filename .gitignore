@@ -34,3 +34,5 @@ coverage/
 
 # OS generated files
 Thumbs.db
+
+supabase/.temp

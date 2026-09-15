@@ -8,8 +8,7 @@ import StatusBadge from "../components/StatusBadge";
 import { EmptyState, NoResultState } from "../components/StateViews";
 import { TableSkeleton } from "../components/LoadingSkeleton";
 import { StudentAvatar } from "../components/AvatarFallback";
-import { fetchVisitRecords, fetchDistinctClasses, subscribeToStudentRecords } from "../../lib/supabase";
-import { CAMERAS } from "../../data/mockData";
+import { fetchVisitRecords, fetchDistinctClasses, fetchDistinctCameras, subscribeToStudentRecords } from "../../lib/supabase";
 import {
   fmtDuration,
   fmtTime,
@@ -17,6 +16,7 @@ import {
   type VisitRecord,
   type VisitSortKey,
   type SortDirection,
+  type CameraOption,
 } from "../../data/types";
 
 interface VisitsPageProps {
@@ -30,8 +30,9 @@ interface VisitsPageProps {
   onSelectRecord: (record: VisitRecord) => void;
 }
 
-function cameraLabel(id: string): string {
-  return CAMERAS.find((c) => c.id === id)?.label.replace(" — Main Service Area", "") ?? id;
+function formatCameraLabel(id: string): string {
+  if (!id) return "Unknown";
+  return id.replace("CAM-", "Camera ");
 }
 
 export default function VisitsPage({
@@ -46,6 +47,7 @@ export default function VisitsPage({
 }: VisitsPageProps) {
   const [records, setRecords] = useState<VisitRecord[]>([]);
   const [classes, setClasses] = useState<string[]>([]);
+  const [cameras, setCameras] = useState<CameraOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<VisitSortKey>("enteredAt");
   const [sortDir, setSortDir] = useState<SortDirection>("desc");
@@ -56,10 +58,11 @@ export default function VisitsPage({
 
     async function load() {
       setLoading(true);
-      const [data, classList] = await Promise.all([fetchVisitRecords(), fetchDistinctClasses()]);
+      const [data, classList, camList] = await Promise.all([fetchVisitRecords(), fetchDistinctClasses(), fetchDistinctCameras()]);
       if (mounted) {
         setRecords(data);
         setClasses(classList);
+        setCameras(camList);
         setLoading(false);
       }
     }
@@ -67,10 +70,11 @@ export default function VisitsPage({
     load();
 
     const sub = subscribeToStudentRecords(() => {
-      Promise.all([fetchVisitRecords(), fetchDistinctClasses()]).then(([updated, updatedClasses]) => {
+      Promise.all([fetchVisitRecords(), fetchDistinctClasses(), fetchDistinctCameras()]).then(([updated, updatedClasses, updatedCameras]) => {
         if (mounted) {
           setRecords(updated);
           setClasses(updatedClasses);
+          setCameras(updatedCameras);
         }
       });
     });
@@ -151,7 +155,7 @@ export default function VisitsPage({
       ),
     },
     { key: "className", header: "Lớp", sortable: true, render: (r) => r.className || "CTK44" },
-    { key: "cameraId", header: "Camera", sortable: true, render: (r) => cameraLabel(r.cameraId) },
+    { key: "cameraId", header: "Camera", sortable: true, render: (r) => formatCameraLabel(r.cameraId) },
     { key: "enteredAt", header: "Giờ vào", sortable: true, render: (r) => fmtTime(r.enteredAt) },
     {
       key: "exitedAt",
@@ -184,7 +188,7 @@ export default function VisitsPage({
     <div className="flex flex-col gap-4">
       <VisitFilterBar
         filters={filters}
-        cameras={CAMERAS}
+        cameras={cameras}
         classes={classes}
         resultCount={sorted.length}
         onChange={onFiltersChange}

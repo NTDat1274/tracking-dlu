@@ -1,6 +1,6 @@
 // src/web/pages/OverviewPage.tsx
 // Realtime Monitoring Dashboard with Live Occupants, Ticking Stopwatch, and Supabase Subscription.
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import KpiCard from "../components/KpiCard";
 import StatusBadge from "../components/StatusBadge";
 import BarChart from "../charts/BarChart";
@@ -8,8 +8,7 @@ import BarChart from "../charts/BarChart";
 import { KpiSkeleton, TableSkeleton } from "../components/LoadingSkeleton";
 import { StudentAvatar } from "../components/AvatarFallback";
 import { fetchVisitRecords, subscribeToStudentRecords } from "../../lib/supabase";
-import { CAMERAS } from "../../data/mockData";
-import { ANALYTICS_WEEKLY } from "../../data/analyticsData";
+import { getCloudConfig } from "../../lib/config";
 import { fmtDuration, fmtTime, type VisitRecord } from "../../data/types";
 
 interface OverviewPageProps {
@@ -58,6 +57,26 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const weeklyData = useMemo(() => {
+    const counts = [0, 0, 0, 0, 0, 0, 0];
+    records.forEach(r => {
+      if (!r.enteredAt) return;
+      const date = new Date(r.enteredAt);
+      if (!isNaN(date.getTime())) {
+        counts[date.getDay()] += 1;
+      }
+    });
+    return [
+      { label: "T2", value: counts[1] },
+      { label: "T3", value: counts[2] },
+      { label: "T4", value: counts[3] },
+      { label: "T5", value: counts[4] },
+      { label: "T6", value: counts[5] },
+      { label: "T7", value: counts[6] },
+      { label: "CN", value: counts[0] },
+    ];
+  }, [records]);
 
   if (loading) {
     return (
@@ -249,7 +268,7 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
         <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
           <h2 className="mb-3 font-display text-sm font-bold text-foreground">Xu hướng tuần (DLU Green)</h2>
           <BarChart
-            data={ANALYTICS_WEEKLY.map((d) => ({ label: d.day, value: d.visits }))}
+            data={weeklyData}
             title="Lượt theo tuần"
           />
         </div>
@@ -258,19 +277,25 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
         <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
           <h2 className="mb-3 font-display text-sm font-bold text-foreground">Trạng thái kết nối</h2>
           <ul className="space-y-2.5 text-xs">
-            {CAMERAS.map((cam) => (
-              <li key={cam.id} className="flex items-center justify-between py-1">
-                <span className="text-foreground">{cam.label}</span>
-                <StatusBadge status={cam.status} />
+            {Array.from(new Set(records.map(r => r.cameraId).filter(Boolean))).map((camId) => (
+              <li key={camId} className="flex items-center justify-between py-1">
+                <span className="text-foreground">{camId}</span>
+                <StatusBadge status="Connected" />
               </li>
             ))}
+            {records.length === 0 && (
+              <li className="flex items-center justify-between py-1">
+                <span className="text-muted-foreground">Cameras</span>
+                <StatusBadge status="Offline" />
+              </li>
+            )}
             <li className="flex items-center justify-between py-1">
               <span className="text-foreground">Supabase PostgreSQL</span>
-              <StatusBadge status="Connected" />
+              <StatusBadge status={getCloudConfig().supabaseUrl ? "Connected" : "Offline"} />
             </li>
             <li className="flex items-center justify-between py-1">
               <span className="text-foreground">Cloudinary Storage</span>
-              <StatusBadge status="Connected" />
+              <StatusBadge status={getCloudConfig().cloudinaryCloudName ? "Connected" : "Offline"} />
             </li>
           </ul>
         </div>
