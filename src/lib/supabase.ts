@@ -302,7 +302,7 @@ export async function fetchDistinctClasses(): Promise<string[]> {
 
 
 /**
- * Dynamically extract distinct camera IDs from student_records
+ * Dynamically extract distinct live cameras from the heartbeat table 'cameras'
  */
 export async function fetchDistinctCameras(): Promise<CameraOption[]> {
   const defaultCameras: CameraOption[] = [{ id: "CAM-01", label: "Camera 01", fps: 30, status: "Connected" }];
@@ -311,21 +311,31 @@ export async function fetchDistinctCameras(): Promise<CameraOption[]> {
   if (!client) return defaultCameras;
 
   try {
-    const { data, error } = await client.from("student_records").select("camera_id");
-    if (error || !data) return defaultCameras;
+    const { data, error } = await client.from("cameras").select("*");
+    if (error || !data || data.length === 0) return defaultCameras;
     
-    const fromDb = data.map((d: any) => d.camera_id).filter(Boolean);
-    const unique = Array.from(new Set(fromDb)).sort() as string[];
-    
-    if (unique.length === 0) return defaultCameras;
-    
-    return unique.map(id => ({ 
-      id, 
-      label: `Camera ${id.replace("CAM-", "")}`,
-      fps: 30,
-      status: "Connected"
-    }));
-  } catch {
+    const now = Date.now();
+    return data.map((d: any) => {
+      let isOffline = d.status === "Offline";
+      
+      // Calculate age of heartbeat
+      if (d.last_active_at) {
+        const lastActive = new Date(d.last_active_at).getTime();
+        if (now - lastActive > 15000) {
+           isOffline = true; // 15 seconds timeout
+        }
+      } else {
+        isOffline = true;
+      }
+
+      return {
+        id: d.id,
+        label: d.label || `Camera ${d.id}`,
+        fps: d.fps || 30,
+        status: isOffline ? "Offline" : "Connected"
+      };
+    });
+  } catch (err) {
     return defaultCameras;
   }
 }

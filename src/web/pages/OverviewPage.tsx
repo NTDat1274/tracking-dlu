@@ -7,9 +7,9 @@ import BarChart from "../charts/BarChart";
 
 import { KpiSkeleton, TableSkeleton } from "../components/LoadingSkeleton";
 import { StudentAvatar } from "../components/AvatarFallback";
-import { fetchVisitRecords, subscribeToStudentRecords } from "../../lib/supabase";
+import { fetchVisitRecords, subscribeToStudentRecords, fetchDistinctCameras } from "../../lib/supabase";
 import { getCloudConfig } from "../../lib/config";
-import { fmtDuration, fmtTime, type VisitRecord } from "../../data/types";
+import { fmtDuration, fmtTime, type VisitRecord, type CameraOption } from "../../data/types";
 
 interface OverviewPageProps {
   onViewWaitingList: () => void;
@@ -18,6 +18,7 @@ interface OverviewPageProps {
 
 export default function OverviewPage({ onViewWaitingList, onSelectRecord }: OverviewPageProps) {
   const [records, setRecords] = useState<VisitRecord[]>([]);
+  const [cameras, setCameras] = useState<CameraOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
 
@@ -28,8 +29,10 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
     async function loadData() {
       setLoading(true);
       const data = await fetchVisitRecords();
+      const cams = await fetchDistinctCameras();
       if (mounted) {
         setRecords(data);
+        setCameras(cams);
         setLoading(false);
       }
     }
@@ -41,6 +44,9 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
       // Re-fetch records on changes (INSERT/UPDATE/DELETE)
       fetchVisitRecords().then((updated) => {
         if (mounted) setRecords(updated);
+      });
+      fetchDistinctCameras().then((cams) => {
+        if (mounted) setCameras(cams);
       });
     });
 
@@ -56,6 +62,20 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
       setCurrentTime(Date.now());
     }, 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // 4. Poll live camera status every 5 seconds
+  useEffect(() => {
+    let mounted = true;
+    const timer = setInterval(() => {
+      fetchDistinctCameras().then((cams) => {
+        if (mounted) setCameras(cams);
+      });
+    }, 5000);
+    return () => {
+      mounted = false;
+      clearInterval(timer);
+    };
   }, []);
 
   const weeklyData = useMemo(() => {
@@ -277,13 +297,13 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
         <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
           <h2 className="mb-3 font-display text-sm font-bold text-foreground">Trạng thái kết nối</h2>
           <ul className="space-y-2.5 text-xs">
-            {Array.from(new Set(records.map(r => r.cameraId).filter(Boolean))).map((camId) => (
-              <li key={camId} className="flex items-center justify-between py-1">
-                <span className="text-foreground">{camId}</span>
-                <StatusBadge status="Connected" />
+            {cameras.map((cam) => (
+              <li key={cam.id} className="flex items-center justify-between py-1">
+                <span className="text-foreground">{cam.id} - {cam.label}</span>
+                <StatusBadge status={cam.status || "Connected"} />
               </li>
             ))}
-            {records.length === 0 && (
+            {cameras.length === 0 && (
               <li className="flex items-center justify-between py-1">
                 <span className="text-muted-foreground">Cameras</span>
                 <StatusBadge status="Offline" />
