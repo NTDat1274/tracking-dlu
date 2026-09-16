@@ -1,8 +1,12 @@
 // src/web/components/ExportModal.tsx
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { fetchVisitRecords } from "../../lib/supabase";
+import type { VisitRecord } from "../../data/types";
 
-type ExportFormat = "CSV" | "JSON" | "PDF";
-const FORMATS: ExportFormat[] = ["CSV", "JSON", "PDF"];
+type ExportFormat = "CSV" | "PDF";
+const FORMATS: ExportFormat[] = ["CSV", "PDF"];
 
 interface ExportModalProps {
   open: boolean;
@@ -14,16 +18,22 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
   const triggerElRef = useRef<Element | null>(null);
 
   const [format, setFormat] = useState<ExportFormat>("CSV");
-  const [dateFrom, setDateFrom] = useState("2026-09-01");
-  const [dateTo, setDateTo] = useState("2026-09-04");
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split("T")[0];
+  });
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split("T")[0]);
   const [statusFilters, setStatusFilters] = useState({ Served: true, Waiting: true, Unattended: true });
   const [exporting, setExporting] = useState(false);
+  const [allRecords, setAllRecords] = useState<VisitRecord[]>([]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
 
     if (open) {
+      fetchVisitRecords().then(setAllRecords);
       triggerElRef.current = document.activeElement;
       if (!dialog.open) dialog.showModal();
     } else if (dialog.open) {
@@ -39,15 +49,93 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
     });
   }
 
-  function handleExport() {
-    setExporting(true);
-    window.setTimeout(handleClose, 1200);
-  }
+  const baseFiltered = useMemo(() => {
+    const start = new Date(dateFrom).getTime();
+    const end = new Date(dateTo).getTime() + 86400000;
+    return allRecords.filter((r) => {
+      const t = new Date(r.enteredAt).getTime();
+      return t >= start && t < end;
+    });
+  }, [allRecords, dateFrom, dateTo]);
 
-  const counts: Record<keyof typeof statusFilters, number> = { Served: 31, Waiting: 9, Unattended: 7 };
+  const counts = useMemo(() => {
+    return baseFiltered.reduce(
+      (acc, curr) => {
+        const s = curr.status as keyof typeof statusFilters;
+        if (acc[s] !== undefined) acc[s]++;
+        return acc;
+      },
+      { Served: 0, Waiting: 0, Unattended: 0 }
+    );
+  }, [baseFiltered]);
+
+  const filteredRecords = useMemo(() => {
+    return baseFiltered.filter((r) => statusFilters[r.status as keyof typeof statusFilters]);
+  }, [baseFiltered, statusFilters]);
+
   const total = Object.entries(statusFilters)
     .filter(([, v]) => v)
     .reduce((sum, [k]) => sum + counts[k as keyof typeof counts], 0);
+
+  function exportCSV() {
+    const headers = ["ID", "Student ID", "Name", "Class", "Entered At", "Exited At", "Duration (s)", "Status"];
+    const rows = filteredRecords.map((r) => [
+      r.id,
+      r.studentId,
+      r.studentName,
+      r.className,
+      r.enteredAt,
+      r.exitedAt || "",
+      r.durationSeconds || "",
+      r.status,
+    ]);
+    const csvContent = "\uFEFF" + [headers, ...rows].map((e) => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8-sig;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `export_${dateFrom}_${dateTo}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  function exportPDF() {
+    const doc = new jsPDF("landscape");
+    doc.text("TrackingZ Event Log", 14, 15);
+    doc.setFontSize(10);
+    doc.text(`From: ${dateFrom} - To: ${dateTo}`, 14, 22);
+
+    autoTable(doc, {
+      startY: 25,
+      head: [["ID", "Student ID", "Name", "Class", "Entered At", "Exited At", "Duration (s)", "Status"]],
+      body: filteredRecords.map((r) => [
+        r.id,
+        r.studentId,
+        r.studentName,
+        r.className,
+        new Date(r.enteredAt).toLocaleString(),
+        r.exitedAt ? new Date(r.exitedAt).toLocaleString() : "",
+        r.durationSeconds || "",
+        r.status,
+      ]),
+    });
+
+    doc.save(`export_${dateFrom}_${dateTo}.pdf`);
+  }
+
+  function handleExport() {
+    setExporting(true);
+    setTimeout(() => {
+      try {
+        if (format === "CSV") exportCSV();
+        else if (format === "PDF") exportPDF();
+      } catch (err) {
+        console.error("Export error:", err);
+      }
+      handleClose();
+    }, 500);
+  }
 
   return (
     <dialog
@@ -60,7 +148,7 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
-      className="rounded-lg border border-border bg-card p-0 shadow-xl backdrop:bg-black/40"
+      className="m-auto rounded-lg border border-border bg-card p-0 shadow-xl backdrop:bg-black/40"
     >
       <div onClick={(e) => e.stopPropagation()} className="w-[380px] p-5">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Data Export</p>

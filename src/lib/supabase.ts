@@ -82,6 +82,12 @@ export async function fetchStudents(): Promise<StudentSummary[]> {
       return [...localStudents];
     }
 
+    // Helper to fix timezone shift by treating DB time as local
+    const toLocalIso = (isoStr: string) => {
+      if (!isoStr) return isoStr;
+      return isoStr.replace(/(Z|[+-]\d{2}:?\d{2})$/, '');
+    };
+
     // Map DB schema to UI StudentSummary
     return data.map((d: any) => {
       const matchHistory = localRecords.filter((r) => r.studentId === d.student_id);
@@ -89,11 +95,11 @@ export async function fetchStudents(): Promise<StudentSummary[]> {
       return {
         studentId: d.student_id,
         name: d.full_name,
-        className: d.class_name || "CNTT",
+        className: d.class_name ? String(d.class_name).trim() : "CNTT",
         totalVisits: matchHistory.length,
         servedCount,
         avgWaitSecs: 180,
-        lastSeen: d.created_at || new Date().toISOString(),
+        lastSeen: toLocalIso(d.created_at) || new Date().toISOString(),
         lastCameraId: "CAM-01",
         currentlyInArea: false,
         portraitUrl: d.portrait_url,
@@ -229,29 +235,54 @@ export async function fetchVisitRecords(): Promise<VisitRecord[]> {
   }
 
   try {
-    const { data, error } = await client
-      .from("student_records")
-      .select("*")
-      .order("time_in", { ascending: false });
+    const [ { data: recordsData, error: recordsError }, { data: studentsData } ] = await Promise.all([
+      client.from("student_records").select("*").order("time_in", { ascending: false }),
+      client.from("students").select("student_id, class_name")
+    ]);
 
-    if (error || !data || data.length === 0) {
+    if (recordsError || !recordsData || recordsData.length === 0) {
       return [...localRecords];
     }
 
-    return data.map((d: any) => {
-      // Normalize status to 3 standard types: Served, Waiting, Unattended
+    // Map students for quick lookup
+    const studentMap = new Map<string, string>();
+    if (studentsData) {
+      for (const s of studentsData) {
+        if (s.student_id) {
+          studentMap.set(String(s.student_id).trim(), s.class_name || "Unknown");
+        }
+      }
+    }
+
+    // Helper to fix timezone shift by treating DB time as local
+    const toLocalIso = (isoStr: string) => {
+      if (!isoStr) return isoStr;
+      return isoStr.replace(/(Z|[+-]\d{2}:?\d{2})$/, '');
+    };
+
+    return recordsData.map((d: any) => {
       let status: VisitStatus = "Waiting";
       const s = (d.status || "").toUpperCase();
       if (s === "SERVED" || s === "COMPLETED") status = "Served";
       else if (s === "UNATTENDED" || s === "ABANDONED") status = "Unattended";
 
-      const timeIn = d.time_in || d.created_at || new Date().toISOString();
+      const timeIn = toLocalIso(d.time_in || d.created_at) || new Date().toISOString();
+      const timeOut = d.time_out ? toLocalIso(d.time_out) : undefined;
+      
       const enteredMs = new Date(timeIn).getTime();
-      const exitedMs = d.time_out ? new Date(d.time_out).getTime() : Date.now();
+      const exitedMs = timeOut ? new Date(timeOut).getTime() : Date.now();
       const durSecs = Math.max(0, Math.round((exitedMs - enteredMs) / 1000));
 
-      const matchingStudent = localStudents.find((s) => s.studentId === d.student_id);
-      const studentClass = matchingStudent ? matchingStudent.className : (d.class_name || "CTK44");
+      // Resolve class name robustly
+      let studentClass = "Unknown";
+      const recordStudentId = d.student_id ? String(d.student_id).trim() : null;
+      
+      if (recordStudentId && studentMap.has(recordStudentId)) {
+        studentClass = studentMap.get(recordStudentId) || "Unknown";
+      } else if (d.class_name) {
+        studentClass = String(d.class_name);
+      }
+      studentClass = studentClass.trim();
 
       return {
         id: String(d.id),
@@ -261,7 +292,7 @@ export async function fetchVisitRecords(): Promise<VisitRecord[]> {
         status,
         cameraId: d.camera_id || "CAM-01",
         enteredAt: timeIn,
-        exitedAt: d.time_out || undefined,
+        exitedAt: timeOut,
         durationSeconds: d.duration_seconds || durSecs,
         waitSeconds: durSecs > 180 ? 180 : durSecs,
         snapshotUrl: d.snapshot_url,
@@ -278,24 +309,24 @@ export async function fetchVisitRecords(): Promise<VisitRecord[]> {
  * Dynamically extract distinct classes from Supabase & local students
  */
 export async function fetchDistinctClasses(): Promise<string[]> {
-  const defaultClasses = ["CTK41", "CTK42", "CTK43", "CTK44", "CTK45"];
   const client = getSupabaseClient();
 
   if (!client) {
-    const fromLocal = localStudents.map((s) => s.className).filter(Boolean);
-    return Array.from(new Set([...defaultClasses, ...fromLocal])).sort();
+    const fromLocal = localStudents.map((s) => s.className?.trim()).filter(Boolean);
+    return Array.from(new Set(fromLocal)).sort();
   }
 
   try {
     const { data, error } = await client.from("students").select("class_name");
     if (error || !data) {
-      const fromLocal = localStudents.map((s) => s.className).filter(Boolean);
-      return Array.from(new Set([...defaultClasses, ...fromLocal])).sort();
+      const fromLocal = localStudents.map((s) => s.className?.trim()).filter(Boolean);
+      return Array.from(new Set(fromLocal)).sort();
     }
-    const fromDb = data.map((d: any) => d.class_name).filter(Boolean);
-    return Array.from(new Set([...defaultClasses, ...fromDb])).sort();
+    const fromDb = data.map((d: any) => d.class_name?.trim()).filter(Boolean);
+    return Array.from(new Set(fromDb)).sort();
   } catch {
-    return defaultClasses;
+    const fromLocal = localStudents.map((s) => s.className?.trim()).filter(Boolean);
+    return Array.from(new Set(fromLocal)).sort();
   }
 }
 
@@ -320,7 +351,8 @@ export async function fetchDistinctCameras(): Promise<CameraOption[]> {
       
       // Calculate age of heartbeat
       if (d.last_active_at) {
-        const lastActive = new Date(d.last_active_at).getTime();
+        const localIso = d.last_active_at.replace(/(Z|[+-]\d{2}:?\d{2})$/, '');
+        const lastActive = new Date(localIso).getTime();
         if (now - lastActive > 15000) {
            isOffline = true; // 15 seconds timeout
         }

@@ -20,20 +20,24 @@ import type { VisitRecord } from "../../data/types";
 export type WebPage = "overview" | "analytics" | "visits" | "students" | "settings";
 export type WebModal = "export" | null;
 
-const TODAY_FROM = "2026-09-01";
-const TODAY_TO = "2026-09-04";
+const getTodayStr = () => new Date().toISOString().split("T")[0];
+const getWeekAgoStr = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 7);
+  return d.toISOString().split("T")[0];
+};
 
 const DEFAULT_ANALYTICS_FILTERS: AnalyticsFilterState = {
-  dateFrom: TODAY_FROM,
-  dateTo: TODAY_TO,
+  dateFrom: getWeekAgoStr(),
+  dateTo: getTodayStr(),
   cameraId: "",
   className: "",
   status: "All",
 };
 
 const DEFAULT_VISIT_FILTERS: VisitFilterState = {
-  dateFrom: TODAY_FROM,
-  dateTo: TODAY_TO,
+  dateFrom: getWeekAgoStr(),
+  dateTo: getTodayStr(),
   searchQuery: "",
   cameraId: "",
   className: "",
