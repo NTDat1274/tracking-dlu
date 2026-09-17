@@ -218,7 +218,7 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
                     >
                       <td className="py-2.5">
                         <div className="flex items-center gap-2.5">
-                          <StudentAvatar name={occ.studentName} size="sm" />
+                          <StudentAvatar src={occ.avatarUrl} name={occ.studentName} size="sm" />
                           <div>
                             <p className="font-semibold text-foreground">{occ.studentName}</p>
                             <p className="text-[10px] text-muted-foreground">{occ.studentId}</p>
@@ -269,16 +269,18 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
                 onClick={() => onSelectRecord?.(r)}
                 className="flex items-center justify-between rounded-xl border border-border/50 bg-background/40 p-2.5 hover:border-primary/40 cursor-pointer transition-colors"
               >
-                <div className="flex items-center gap-2.5">
-                  <StudentAvatar name={r.studentName} size="sm" />
-                  <div>
-                    <p className="text-xs font-semibold text-foreground">{r.studentName}</p>
-                    <p className="text-[10px] text-muted-foreground">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <StudentAvatar src={r.avatarUrl} name={r.studentName} size="sm" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-foreground truncate" title={r.studentName}>{r.studentName}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">
                       {r.studentId} · {fmtTime(r.enteredAt)}
                     </p>
                   </div>
                 </div>
-                <StatusBadge status={r.status} />
+                <div className="shrink-0 ml-2">
+                  <StatusBadge status={r.status} />
+                </div>
               </li>
             ))}
           </ul>

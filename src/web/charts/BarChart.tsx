@@ -52,6 +52,7 @@ export default function BarChart({ data, title, unit = "lượt" }: BarChartProp
                 onMouseLeave={() => setHoverIndex(null)}
                 onFocus={() => setHoverIndex(i)}
                 onBlur={() => setHoverIndex(null)}
+                className="focus:outline-none"
               />
             </g>
           );

@@ -6,6 +6,7 @@ import ConfirmDialog from "../components/ConfirmDialog";
 import { NoResultState, EmptyState } from "../components/StateViews";
 import { StudentCardSkeleton } from "../components/LoadingSkeleton";
 import { StudentAvatar } from "../components/AvatarFallback";
+import StatusBadge from "../components/StatusBadge";
 import StudentModal, { type StudentFormData } from "../components/StudentModal";
 import { fetchStudents, deleteStudentCascade, fetchVisitRecords, fetchDistinctClasses } from "../../lib/supabase";
 import { fmtDateTime, fmtDuration, isWaitingTooLong, type StudentSummary, type VisitRecord } from "../../data/types";
@@ -54,8 +55,27 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
     };
   }, []);
 
+  const enrichedStudents = useMemo(() => {
+    return students.map((s) => {
+      const stuVisits = visits.filter((v) => v.studentId === s.studentId);
+      const totalVisits = stuVisits.length;
+      const servedCount = stuVisits.filter((v) => v.status === "Served").length;
+      let avgWaitSecs = 0;
+      if (totalVisits > 0) {
+        const sum = stuVisits.reduce((acc, v) => acc + (v.waitSeconds || 0), 0);
+        avgWaitSecs = Math.round(sum / totalVisits);
+      }
+      return {
+        ...s,
+        totalVisits,
+        servedCount,
+        avgWaitSecs,
+      };
+    });
+  }, [students, visits]);
+
   const targetClass = filters.className;
-  const filtered = students.filter((s) => {
+  const filtered = enrichedStudents.filter((s) => {
     if (targetClass && s.className.toLowerCase() !== targetClass.toLowerCase()) return false;
     if (
       filters.searchQuery &&
@@ -90,7 +110,7 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
     return arr;
   }, [filtered, filters.sortBy, filters.sortDirection]);
 
-  const selected = students.find((s) => s.studentId === selectedId) ?? null;
+  const selected = enrichedStudents.find((s) => s.studentId === selectedId) ?? null;
   const history = visits.filter((r) => r.studentId === selectedId).slice(0, 8);
 
   function handleOpenAdd() {
@@ -327,7 +347,9 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
                   {history.map((h) => (
                     <tr key={h.id}>
                       <td className="px-3 py-2 text-foreground font-medium">{fmtDateTime(h.enteredAt)}</td>
-                      <td className="px-3 py-2 text-primary font-semibold">{h.status}</td>
+                      <td className="px-3 py-2">
+                        <StatusBadge status={h.status} />
+                      </td>
                       <td className="px-3 py-2 text-muted-foreground">{fmtDuration(h.durationSeconds)}</td>
                     </tr>
                   ))}

@@ -50,6 +50,7 @@ export default function DonutChart({ data, title }: { data: DonutSlice[]; title:
               tabIndex={0}
               role="img"
               aria-label={`${slice.label}: ${slice.value} (${Math.round(fraction * 100)}%)`}
+              className="focus:outline-none"
             />
           );
         })}

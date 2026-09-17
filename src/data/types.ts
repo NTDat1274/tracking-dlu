@@ -20,6 +20,7 @@ export interface VisitRecord {
   exitedAt?: string;
   durationSeconds: number;
   waitSeconds: number;
+  avatarUrl?: string;
 }
 
 export interface StudentSummary {
@@ -77,8 +78,9 @@ export function isWaitingTooLong(
 }
 
 export function fmtDuration(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
+  const total = Math.floor(totalSeconds);
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
   return `${minutes}m ${seconds}s`;
 }
 

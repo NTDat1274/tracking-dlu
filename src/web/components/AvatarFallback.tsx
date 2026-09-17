@@ -20,9 +20,18 @@ export function StudentAvatar({ src, name, size = "md", className = "" }: Avatar
     xl: "h-24 w-24 text-xl",
   };
 
+  // Remove diacritics
+  const removeDiacritics = (str: string) => {
+    return str
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D");
+  };
+
   // Get initials for placeholder
   const initials = name
-    ? name
+    ? removeDiacritics(name)
         .trim()
         .split(" ")
         .map((n) => n[0])

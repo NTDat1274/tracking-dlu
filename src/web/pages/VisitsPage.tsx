@@ -146,7 +146,7 @@ export default function VisitsPage({
       sortable: true,
       render: (r) => (
         <div className="flex items-center gap-2.5">
-          <StudentAvatar name={r.studentName} size="sm" />
+          <StudentAvatar src={r.avatarUrl} name={r.studentName} size="sm" />
           <div>
             <p className="font-semibold text-foreground text-xs">{r.studentName}</p>
             <p className="text-[11px] text-muted-foreground">{r.studentId}</p>
@@ -164,11 +164,12 @@ export default function VisitsPage({
       render: (r) => (r.exitedAt ? fmtTime(r.exitedAt) : "Đang ở"),
     },
     { key: "waitSeconds", header: "T/g chờ", sortable: true, render: (r) => fmtDuration(r.waitSeconds) },
-    { key: "durationSeconds", header: "Tổng t/g", sortable: true, render: (r) => fmtDuration(r.durationSeconds) },
+    { key: "durationSeconds", header: "Tổng t/g", sortable: true, className: "whitespace-nowrap", render: (r) => fmtDuration(r.durationSeconds) },
     { key: "status", header: "Trạng thái", sortable: true, render: (r) => <StatusBadge status={r.status} /> },
     {
       key: "actions",
       header: "Thao tác",
+      className: "whitespace-nowrap w-24 text-right",
       render: (r) => (
         <button
           type="button"

@@ -237,7 +237,7 @@ export async function fetchVisitRecords(): Promise<VisitRecord[]> {
   try {
     const [ { data: recordsData, error: recordsError }, { data: studentsData } ] = await Promise.all([
       client.from("student_records").select("*").order("time_in", { ascending: false }),
-      client.from("students").select("student_id, class_name")
+      client.from("students").select("student_id, class_name, portrait_url")
     ]);
 
     if (recordsError || !recordsData || recordsData.length === 0) {
@@ -245,11 +245,14 @@ export async function fetchVisitRecords(): Promise<VisitRecord[]> {
     }
 
     // Map students for quick lookup
-    const studentMap = new Map<string, string>();
+    const studentMap = new Map<string, { className: string; portraitUrl: string }>();
     if (studentsData) {
       for (const s of studentsData) {
         if (s.student_id) {
-          studentMap.set(String(s.student_id).trim(), s.class_name || "Unknown");
+          studentMap.set(String(s.student_id).trim(), {
+            className: s.class_name || "Unknown",
+            portraitUrl: s.portrait_url || ""
+          });
         }
       }
     }
@@ -263,8 +266,8 @@ export async function fetchVisitRecords(): Promise<VisitRecord[]> {
     return recordsData.map((d: any) => {
       let status: VisitStatus = "Waiting";
       const s = (d.status || "").toUpperCase();
-      if (s === "SERVED" || s === "COMPLETED") status = "Served";
-      else if (s === "UNATTENDED" || s === "ABANDONED") status = "Unattended";
+      if (s === "SERVED" || s === "COMPLETED" || s === "ĐÃ TIẾP NHẬN") status = "Served";
+      else if (s === "UNATTENDED" || s === "ABANDONED" || s === "CHƯA TIẾP NHẬN") status = "Unattended";
 
       const timeIn = toLocalIso(d.time_in || d.created_at) || new Date().toISOString();
       const timeOut = d.time_out ? toLocalIso(d.time_out) : undefined;
@@ -273,16 +276,31 @@ export async function fetchVisitRecords(): Promise<VisitRecord[]> {
       const exitedMs = timeOut ? new Date(timeOut).getTime() : Date.now();
       const durSecs = Math.max(0, Math.round((exitedMs - enteredMs) / 1000));
 
-      // Resolve class name robustly
+      // Resolve class name and portrait robustly
       let studentClass = "Unknown";
+      let portraitUrl = "";
       const recordStudentId = d.student_id ? String(d.student_id).trim() : null;
       
       if (recordStudentId && studentMap.has(recordStudentId)) {
-        studentClass = studentMap.get(recordStudentId) || "Unknown";
+        const info = studentMap.get(recordStudentId);
+        if (info) {
+          studentClass = info.className;
+          portraitUrl = info.portraitUrl;
+        }
       } else if (d.class_name) {
         studentClass = String(d.class_name);
       }
       studentClass = studentClass.trim();
+
+      // Avatar logic
+      let computedAvatarUrl = undefined;
+      const isRegisteredStudent = recordStudentId && studentMap.has(recordStudentId);
+      
+      if (isRegisteredStudent && portraitUrl) {
+        computedAvatarUrl = portraitUrl;
+      } else if (d.best_crop && d.student_name !== "Ẩn danh") {
+        computedAvatarUrl = d.best_crop;
+      }
 
       return {
         id: String(d.id),
@@ -295,6 +313,7 @@ export async function fetchVisitRecords(): Promise<VisitRecord[]> {
         exitedAt: timeOut,
         durationSeconds: d.duration_seconds || durSecs,
         waitSeconds: durSecs > 180 ? 180 : durSecs,
+        avatarUrl: computedAvatarUrl,
         snapshotUrl: d.snapshot_url,
         bestCrop: d.best_crop || d.snapshot_url,
       } as VisitRecord & { snapshotUrl?: string; bestCrop?: string };

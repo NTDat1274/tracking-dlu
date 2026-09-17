@@ -18,27 +18,27 @@ const CONFIG: Record<string, StatusConfig> = {
   Served: {
     icon: "✓",
     className: "bg-[#9ABE26]/15 text-[#9ABE26] border-[#9ABE26]/40",
-    label: "Served",
+    label: "Đã tiếp nhận",
   },
   Waiting: {
     icon: "⏱",
     className: "bg-[#FFA12D]/15 text-[#FFA12D] border-[#FFA12D]/40",
-    label: "Waiting",
+    label: "Đang chờ",
   },
   Unattended: {
     icon: "✗",
     className: "bg-[#E2231A]/15 text-[#E2231A] border-[#E2231A]/40",
-    label: "Unattended",
+    label: "Chưa tiếp nhận",
   },
   Connected: {
     icon: "●",
     className: "bg-[#9ABE26]/15 text-[#9ABE26] border-[#9ABE26]/40",
-    label: "Connected",
+    label: "Đã kết nối",
   },
   Offline: {
     icon: "○",
     className: "bg-[#E2231A]/15 text-[#E2231A] border-[#E2231A]/40",
-    label: "Offline",
+    label: "Mất kết nối",
   },
 };
 

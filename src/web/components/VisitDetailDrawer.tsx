@@ -63,7 +63,7 @@ export default function VisitDetailDrawer({ record, onClose }: VisitDetailDrawer
             <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background/60 p-4">
               <div className="flex items-center gap-3">
                 <StudentAvatar
-                  src={record.bestCrop || (record as any).portraitUrl}
+                  src={record.avatarUrl}
                   name={record.studentName}
                   size="lg"
                 />

@@ -67,7 +67,7 @@ export default function WebSidebar({
                     : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                 } ${collapsed ? "justify-center" : ""}`}
               >
-                <span aria-hidden="true" className="text-sm">{item.icon}</span>
+                <span aria-hidden="true" className="w-5 text-center text-sm">{item.icon}</span>
                 {!collapsed && <span>{item.label}</span>}
               </button>
             );
@@ -95,7 +95,7 @@ export default function WebSidebar({
             collapsed ? "justify-center" : ""
           }`}
         >
-          <span aria-hidden="true">⏻</span>
+          <span aria-hidden="true" className="w-5 text-center text-sm">⏻</span>
           {!collapsed && <span>Đăng xuất</span>}
         </button>
       </div>
