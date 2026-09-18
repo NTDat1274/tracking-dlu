@@ -14,9 +14,8 @@
 :root {
   /* ---- DLU brand raw colors ---- */
   --dlu-green: #9ABE26;
-  --dlu-orange: #FFA12D;
   --dlu-yellow: #FFC600;
-  --dlu-warm-grey: #404B5E;
+  --dlu-warm-grey: #D6D2C4;
   --dlu-red: #E2231A;
 
   /* ---- Semantic Dark Slate UI tokens ---- */
@@ -32,7 +31,7 @@
 
   --primary: var(--dlu-green);
   --primary-foreground: #141820;
-  --secondary: var(--dlu-orange);
+  --secondary: var(--dlu-yellow);
   --secondary-foreground: #141820;
   --accent: var(--dlu-green);
   --accent-foreground: #141820;
@@ -42,9 +41,9 @@
   --border-subtle: #222B38;
 
   /* ---- Status colors (Business logic) ---- */
-  --connected: #9ABE26;
-  --offline: #E2231A;
-  --waiting-color: #FFA12D;
+  --connected: var(--dlu-green);
+  --offline: var(--dlu-red);
+  --waiting-color: var(--dlu-yellow);
 
   --video-background: #0E1117;
   --video-overlay: #07090C;
@@ -63,20 +62,20 @@ html.light,
   --muted: #F1F5F9;
   --muted-foreground: #64748B;
 
-  --primary: #85A81A;
+  --primary: #9ABE26;
   --primary-foreground: #FFFFFF;
-  --secondary: #E88916;
-  --secondary-foreground: #FFFFFF;
-  --accent: #85A81A;
+  --secondary: #FFC600;
+  --secondary-foreground: #000000;
+  --accent: #9ABE26;
   --accent-foreground: #FFFFFF;
-  --ring: #85A81A;
+  --ring: #9ABE26;
 
   --border: #E2E8F0;
   --border-subtle: #F1F5F9;
 
-  --connected: #85A81A;
-  --offline: #DC2626;
-  --waiting-color: #E88916;
+  --connected: #9ABE26;
+  --offline: #E2231A;
+  --waiting-color: #FFC600;
 
   --video-background: #1E293B;
   --video-overlay: #0F172A;
@@ -107,7 +106,6 @@ html.light,
 
   /* DLU brand raw colors */
   --color-dlu-green: var(--dlu-green);
-  --color-dlu-orange: var(--dlu-orange);
   --color-dlu-yellow: var(--dlu-yellow);
   --color-dlu-warm-grey: var(--dlu-warm-grey);
   --color-dlu-red: var(--dlu-red);

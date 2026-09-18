@@ -78,17 +78,20 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
     .reduce((sum, [k]) => sum + counts[k as keyof typeof counts], 0);
 
   function exportCSV() {
-    const headers = ["ID", "Student ID", "Name", "Class", "Entered At", "Exited At", "Duration (s)", "Status"];
-    const rows = filteredRecords.map((r) => [
-      r.id,
-      r.studentId,
-      r.studentName,
-      r.className,
-      r.enteredAt,
-      r.exitedAt || "",
-      r.durationSeconds || "",
-      r.status,
-    ]);
+    const headers = ["ID", "Mã SV", "Tên SV", "Lớp", "Giờ vào", "Giờ ra", "Thời lượng (s)", "Trạng thái"];
+    const rows = filteredRecords.map((r) => {
+      const statusLabels: Record<string, string> = { Served: "Đã tiếp nhận", Waiting: "Đang chờ", Unattended: "Chưa tiếp nhận" };
+      return [
+        r.id,
+        r.studentId,
+        r.studentName,
+        r.className,
+        r.enteredAt,
+        r.exitedAt || "",
+        r.durationSeconds || "",
+        statusLabels[r.status] || r.status,
+      ];
+    });
     const csvContent = "\uFEFF" + [headers, ...rows].map((e) => e.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8-sig;" });
     const url = URL.createObjectURL(blob);
@@ -102,23 +105,26 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
 
   function exportPDF() {
     const doc = new jsPDF("landscape");
-    doc.text("TrackingZ Event Log", 14, 15);
+    doc.text("Báo cáo TrackingZ", 14, 15);
     doc.setFontSize(10);
-    doc.text(`From: ${dateFrom} - To: ${dateTo}`, 14, 22);
+    doc.text(`Từ ngày: ${dateFrom} - Đến ngày: ${dateTo}`, 14, 22);
 
     autoTable(doc, {
       startY: 25,
-      head: [["ID", "Student ID", "Name", "Class", "Entered At", "Exited At", "Duration (s)", "Status"]],
-      body: filteredRecords.map((r) => [
-        r.id,
-        r.studentId,
-        r.studentName,
-        r.className,
-        new Date(r.enteredAt).toLocaleString(),
-        r.exitedAt ? new Date(r.exitedAt).toLocaleString() : "",
-        r.durationSeconds || "",
-        r.status,
-      ]),
+      head: [["ID", "Mã SV", "Tên SV", "Lớp", "Giờ vào", "Giờ ra", "Thời lượng (s)", "Trạng thái"]],
+      body: filteredRecords.map((r) => {
+        const statusLabels: Record<string, string> = { Served: "Đã tiếp nhận", Waiting: "Đang chờ", Unattended: "Chưa tiếp nhận" };
+        return [
+          r.id,
+          r.studentId,
+          r.studentName,
+          r.className,
+          new Date(r.enteredAt).toLocaleString(),
+          r.exitedAt ? new Date(r.exitedAt).toLocaleString() : "",
+          r.durationSeconds || "",
+          statusLabels[r.status] || r.status,
+        ];
+      }),
     });
 
     doc.save(`export_${dateFrom}_${dateTo}.pdf`);
@@ -151,7 +157,7 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
       className="m-auto rounded-lg border border-border bg-card p-0 shadow-xl backdrop:bg-black/40"
     >
       <div onClick={(e) => e.stopPropagation()} className="w-[380px] p-5">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Data Export</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Xuất Dữ Liệu</p>
         <h2 id="export-dialog-title" className="font-display text-base font-semibold text-foreground">
           Xuất Event Log
         </h2>
@@ -159,7 +165,7 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
         <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Khoảng ngày</p>
         <div className="mt-1.5 flex gap-2">
           <label className="flex-1 text-xs">
-            <span className="text-muted-foreground">Từ</span>
+            <span className="text-muted-foreground">Từ ngày</span>
             <input
               type="date"
               value={dateFrom}
@@ -168,7 +174,7 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
             />
           </label>
           <label className="flex-1 text-xs">
-            <span className="text-muted-foreground">Đến</span>
+            <span className="text-muted-foreground">Đến ngày</span>
             <input
               type="date"
               value={dateTo}
@@ -196,7 +202,9 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
 
         <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trạng thái</p>
         <div className="mt-1.5 space-y-1.5">
-          {(Object.keys(statusFilters) as (keyof typeof statusFilters)[]).map((key) => (
+          {(Object.keys(statusFilters) as (keyof typeof statusFilters)[]).map((key) => {
+            const statusLabels: Record<string, string> = { Served: "Đã tiếp nhận", Waiting: "Đang chờ", Unattended: "Chưa tiếp nhận" };
+            return (
             <label key={key} className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-2">
                 <input
@@ -205,11 +213,11 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
                   onChange={() => setStatusFilters((p) => ({ ...p, [key]: !p[key] }))}
                   className="h-4 w-4 accent-primary"
                 />
-                {key}
+                {statusLabels[key] || key}
               </span>
               <span className="text-xs text-muted-foreground">{counts[key]} bản ghi</span>
             </label>
-          ))}
+          )})}
         </div>
 
         <div className="mt-4 flex justify-between border-t border-border-subtle pt-3 text-xs text-muted-foreground">
@@ -221,9 +229,9 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
           type="button"
           onClick={handleExport}
           disabled={exporting}
-          className="focus-ring mt-4 w-full rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground hover:bg-blue-700 disabled:opacity-60"
+          className="focus-ring mt-4 w-full rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
         >
-          {exporting ? "Đang xuất..." : `Xuất ${format}`}
+          {exporting ? "Đang xử lý..." : `Xuất ${format}`}
         </button>
         <button
           type="button"

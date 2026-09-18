@@ -146,7 +146,7 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
           label="Đang có mặt trong phòng"
           value={String(currentOccupants.length)}
           sub="Realtime Occupants"
-          accent="#FFA12D"
+          accent="#FFC600"
         />
         <KpiCard
           label="Thời gian ở trung bình"
@@ -329,7 +329,7 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
         <div className="flex flex-wrap gap-4 text-xs">
           {[
             { label: "Served (Đã tiếp nhận)", count: servedRecords.length, color: "#9ABE26" },
-            { label: "Waiting (Đang chờ)", count: waitingRecords.length, color: "#FFA12D" },
+            { label: "Waiting (Đang chờ)", count: waitingRecords.length, color: "#FFC600" },
             { label: "Unattended (Chưa tiếp nhận)", count: unattendedRecords.length, color: "#E2231A" },
           ].map((s) => {
             const pct = totalVisits > 0 ? Math.round((s.count / totalVisits) * 100) : 0;

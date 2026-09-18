@@ -17,27 +17,27 @@ interface StatusConfig {
 const CONFIG: Record<string, StatusConfig> = {
   Served: {
     icon: "✓",
-    className: "bg-[#9ABE26]/15 text-[#9ABE26] border-[#9ABE26]/40",
+    className: "bg-primary/15 text-primary border-primary/40",
     label: "Đã tiếp nhận",
   },
   Waiting: {
     icon: "⏱",
-    className: "bg-[#FFA12D]/15 text-[#FFA12D] border-[#FFA12D]/40",
+    className: "bg-secondary/15 text-secondary border-secondary/40",
     label: "Đang chờ",
   },
   Unattended: {
     icon: "✗",
-    className: "bg-[#E2231A]/15 text-[#E2231A] border-[#E2231A]/40",
+    className: "bg-offline/15 text-offline border-offline/40",
     label: "Chưa tiếp nhận",
   },
   Connected: {
     icon: "●",
-    className: "bg-[#9ABE26]/15 text-[#9ABE26] border-[#9ABE26]/40",
+    className: "bg-primary/15 text-primary border-primary/40",
     label: "Đã kết nối",
   },
   Offline: {
     icon: "○",
-    className: "bg-[#E2231A]/15 text-[#E2231A] border-[#E2231A]/40",
+    className: "bg-offline/15 text-offline border-offline/40",
     label: "Mất kết nối",
   },
 };

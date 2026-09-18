@@ -4,6 +4,7 @@ import BarChart from "../charts/BarChart";
 import DonutChart from "../charts/DonutChart";
 import HeatmapGrid from "../charts/HeatmapGrid";
 import { EmptyState } from "../components/StateViews";
+import { KpiSkeleton, TableSkeleton } from "../components/LoadingSkeleton";
 import { isWithinDateRange, type Insight, type VisitRecord, type CameraOption } from "../../data/types";
 import { fetchDistinctClasses, fetchDistinctCameras, fetchVisitRecords, subscribeToStudentRecords } from "../../lib/supabase";
 
@@ -15,7 +16,7 @@ interface AnalyticsPageProps {
 
 const STATUS_COLOR: Record<string, string> = {
   Served: "#9ABE26",
-  Waiting: "#FFA12D",
+  Waiting: "#FFC600",
   Unattended: "#E2231A",
 };
 
@@ -23,15 +24,18 @@ export default function AnalyticsPage({ filters, onFiltersChange, onReset }: Ana
   const [classes, setClasses] = useState<string[]>([]);
   const [cameras, setCameras] = useState<CameraOption[]>([]);
   const [records, setRecords] = useState<VisitRecord[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
     async function load() {
+      setLoading(true);
       const [data, classList, camList] = await Promise.all([fetchVisitRecords(), fetchDistinctClasses(), fetchDistinctCameras()]);
       if (mounted) {
         setRecords(data);
         setClasses(classList);
         setCameras(camList);
+        setLoading(false);
       }
     }
     load();
@@ -110,6 +114,31 @@ export default function AnalyticsPage({ filters, onFiltersChange, onReset }: Ana
 
   const daysLabels = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
   const hoursLabels = ["07h", "08h", "09h", "10h", "11h", "12h", "13h", "14h", "15h", "16h", "17h"];
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-5">
+        <AnalyticsFilterBar
+          filters={filters}
+          cameras={cameras}
+          classes={classes}
+          resultCount={0}
+          onChange={onFiltersChange}
+          onReset={onReset}
+        />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <KpiSkeleton />
+          <KpiSkeleton />
+          <KpiSkeleton />
+        </div>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+          <TableSkeleton rows={4} cols={1} />
+          <TableSkeleton rows={4} cols={1} />
+          <TableSkeleton rows={4} cols={1} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5">
