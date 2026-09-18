@@ -55,7 +55,7 @@ export default function StatusBadge({ status }: { status: VisitStatus | CameraSt
     <span
       role="status"
       aria-label={cfg.label}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium backdrop-blur-xs select-none ${cfg.className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium backdrop-blur-xs select-none whitespace-nowrap shrink-0 ${cfg.className}`}
     >
       <span aria-hidden="true" className="font-bold">{cfg.icon}</span>
       {cfg.label}

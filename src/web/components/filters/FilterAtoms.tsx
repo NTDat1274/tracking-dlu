@@ -97,7 +97,12 @@ export function StatusSelect({
   value: VisitStatus | "All";
   onChange: (status: VisitStatus | "All") => void;
 }) {
-  const options: (VisitStatus | "All")[] = ["All", "Served", "Waiting", "Unattended", "Exited", "Unknown"];
+  const options: { value: VisitStatus | "All"; label: string }[] = [
+    { value: "All", label: "Tất cả trạng thái" },
+    { value: "Served", label: "Đã tiếp nhận" },
+    { value: "Waiting", label: "Đang chờ" },
+    { value: "Unattended", label: "Chưa tiếp nhận" },
+  ];
 
   return (
     <select
@@ -107,8 +112,8 @@ export function StatusSelect({
       className="focus-ring rounded-md border border-border bg-card px-2 py-1.5 text-sm"
     >
       {options.map((opt) => (
-        <option key={opt} value={opt}>
-          {opt === "All" ? "Tất cả trạng thái" : opt}
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
         </option>
       ))}
     </select>
@@ -143,7 +148,7 @@ export function ResetButton({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       className="focus-ring rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted"
     >
-      Reset filter
+      Làm mới bộ lọc
     </button>
   );
 }

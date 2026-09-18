@@ -66,9 +66,10 @@ interface SnapshotProps {
   alt?: string;
   className?: string;
   label?: string;
+  onClick?: () => void;
 }
 
-export function SnapshotImage({ src, alt = "Camera snapshot", className = "", label }: SnapshotProps) {
+export function SnapshotImage({ src, alt = "Camera snapshot", className = "", label, onClick }: SnapshotProps) {
   const [hasError, setHasError] = useState(false);
 
   if (!src || hasError) {
@@ -102,7 +103,10 @@ export function SnapshotImage({ src, alt = "Camera snapshot", className = "", la
   }
 
   return (
-    <div className={`relative overflow-hidden rounded-lg border border-border bg-black/40 ${className}`}>
+    <div 
+      className={`relative overflow-hidden rounded-lg border border-border bg-black/40 ${onClick ? 'cursor-pointer' : ''} ${className}`}
+      onClick={onClick}
+    >
       <img
         src={src}
         alt={alt}

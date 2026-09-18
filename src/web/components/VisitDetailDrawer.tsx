@@ -1,6 +1,6 @@
 // src/web/components/VisitDetailDrawer.tsx
 // Slide-over Drawer for displaying detailed visit record, snapshot, and face crop.
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { VisitRecord } from "../../data/types";
 import { fmtDateTime, fmtDuration } from "../../data/types";
 import StatusBadge from "./StatusBadge";
@@ -12,10 +12,15 @@ interface VisitDetailDrawerProps {
 }
 
 export default function VisitDetailDrawer({ record, onClose }: VisitDetailDrawerProps) {
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+
   // Close on Escape key
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        setFullscreenImage(null);
+        onClose();
+      }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -48,23 +53,30 @@ export default function VisitDetailDrawer({ record, onClose }: VisitDetailDrawer
             {/* Drawer Body */}
             <div className="h-[calc(100vh-65px)] overflow-y-auto p-5 space-y-6">
               {/* Student Info Card */}
-              <div className="flex items-center justify-between rounded-xl border border-border/80 bg-background/60 p-4">
-                <div className="flex items-center gap-3">
+              <div className="flex w-full items-center justify-between rounded-xl border border-border/80 bg-background/60 p-4">
+                <div className="flex w-2/3 items-center gap-3 pr-2">
                   <StudentAvatar
                     src={record.avatarUrl}
                     name={record.studentName}
                     size="lg"
                   />
-                  <div>
-                    <p className="font-display text-base font-bold text-foreground">
+                  <div className="flex-1 overflow-hidden">
+                    <p className="font-display text-base font-bold text-foreground break-words leading-tight">
                       {record.studentName}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Mã SV: <span className="font-mono text-primary font-bold">{record.studentId}</span> · Lớp: {record.className}
-                    </p>
+                    <div className="mt-1.5 space-y-0.5">
+                      <p className="text-xs text-muted-foreground">
+                        Mã SV: <span className="font-mono text-primary font-bold">{record.studentId}</span>
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        Lớp: {record.className === "Unknown" ? "Chưa có" : record.className}
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <StatusBadge status={record.status} />
+                <div className="flex w-1/3 justify-end items-center">
+                  <StatusBadge status={record.status} />
+                </div>
               </div>
 
               {/* AI Best Face Crop & Camera Snapshot */}
@@ -147,13 +159,13 @@ export default function VisitDetailDrawer({ record, onClose }: VisitDetailDrawer
       
       {fullscreenImage && (
         <div 
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 p-4 cursor-zoom-out backdrop-blur-sm"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/95 p-4 md:p-12 cursor-zoom-out backdrop-blur-sm"
           onClick={() => setFullscreenImage(null)}
         >
           <img 
             src={fullscreenImage} 
             alt="Fullscreen view" 
-            className="max-h-full max-w-full object-contain"
+            className="h-full w-full object-contain"
           />
           <button 
             className="absolute top-4 right-4 h-10 w-10 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/25 transition-colors"

@@ -154,7 +154,7 @@ export default function VisitsPage({
         </div>
       ),
     },
-    { key: "className", header: "Lớp", sortable: true, render: (r) => r.className || "CTK44" },
+    { key: "className", header: "Lớp", sortable: true, render: (r) => r.className === "Unknown" ? "Chưa có" : (r.className || "CTK44") },
     { key: "cameraId", header: "Camera", sortable: true, render: (r) => formatCameraLabel(r.cameraId) },
     { key: "enteredAt", header: "Giờ vào", sortable: true, render: (r) => fmtTime(r.enteredAt) },
     {

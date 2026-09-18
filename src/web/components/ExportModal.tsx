@@ -85,7 +85,7 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
         r.id,
         r.studentId,
         r.studentName,
-        r.className,
+        r.className === "Unknown" ? "Chưa có" : r.className,
         r.enteredAt,
         r.exitedAt || "",
         r.durationSeconds || "",
@@ -103,14 +103,33 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
     link.remove();
   }
 
-  function exportPDF() {
+  async function exportPDF() {
     const doc = new jsPDF("landscape");
+    
+    // Tải font Roboto (hỗ trợ Tiếng Việt) từ CDN
+    const fontUrl = "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.66/fonts/Roboto/Roboto-Regular.ttf";
+    const response = await fetch(fontUrl);
+    const buffer = await response.arrayBuffer();
+    
+    // Convert arraybuffer to base64
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    const base64Font = btoa(binary);
+    
+    doc.addFileToVFS("Roboto-Regular.ttf", base64Font);
+    doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
+    doc.setFont("Roboto");
+
     doc.text("Báo cáo TrackingZ", 14, 15);
     doc.setFontSize(10);
     doc.text(`Từ ngày: ${dateFrom} - Đến ngày: ${dateTo}`, 14, 22);
 
     autoTable(doc, {
       startY: 25,
+      styles: { font: "Roboto", fontStyle: "normal" },
       head: [["ID", "Mã SV", "Tên SV", "Lớp", "Giờ vào", "Giờ ra", "Thời lượng (s)", "Trạng thái"]],
       body: filteredRecords.map((r) => {
         const statusLabels: Record<string, string> = { Served: "Đã tiếp nhận", Waiting: "Đang chờ", Unattended: "Chưa tiếp nhận" };
@@ -118,7 +137,7 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
           r.id,
           r.studentId,
           r.studentName,
-          r.className,
+          r.className === "Unknown" ? "Chưa có" : r.className,
           new Date(r.enteredAt).toLocaleString(),
           r.exitedAt ? new Date(r.exitedAt).toLocaleString() : "",
           r.durationSeconds || "",
@@ -132,14 +151,15 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
 
   function handleExport() {
     setExporting(true);
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
         if (format === "CSV") exportCSV();
-        else if (format === "PDF") exportPDF();
+        else if (format === "PDF") await exportPDF();
       } catch (err) {
         console.error("Export error:", err);
+      } finally {
+        handleClose();
       }
-      handleClose();
     }, 500);
   }
 
