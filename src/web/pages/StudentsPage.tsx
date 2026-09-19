@@ -10,6 +10,7 @@ import StatusBadge from "../components/StatusBadge";
 import StudentModal, { type StudentFormData } from "../components/StudentModal";
 import { fetchStudents, deleteStudentCascade, fetchVisitRecords, fetchDistinctClasses } from "../../lib/supabase";
 import { fmtDateTime, fmtDuration, isWaitingTooLong, type StudentSummary, type VisitRecord } from "../../data/types";
+import { Trash2, AlertTriangle, Edit2 } from "lucide-react";
 
 interface StudentsPageProps {
   filters: StudentFilterState;
@@ -251,7 +252,7 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
                     onClick={(e) => handleOpenEdit(s, e)}
                     className="focus-ring rounded-lg border border-border/80 p-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                   >
-                    ✎
+                    <Edit2 size={16} />
                   </button>
                   <button
                     type="button"
@@ -259,7 +260,7 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
                     onClick={(e) => handleOpenDelete(s, e)}
                     className="focus-ring rounded-lg border border-offline/40 bg-offline/10 p-1.5 text-xs text-offline hover:bg-offline/20 transition-colors"
                   >
-                    🗑
+                    <Trash2 size={16} />
                   </button>
                 </div>
               </div>
@@ -271,7 +272,7 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
 
               {isWaitingTooLong(s.currentStatus, s.currentWaitSeconds) && (
                 <p className="mt-2 text-xs font-semibold text-secondary flex items-center gap-1">
-                  <span>⚠</span> Chờ tiếp nhận quá 5 phút
+                  <AlertTriangle size={14} className="inline text-amber-500 mr-1" /> Chờ tiếp nhận quá 5 phút
                 </p>
               )}
             </div>
@@ -296,14 +297,14 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
                     onClick={(e) => handleOpenEdit(selected, e)}
                     className="focus-ring inline-flex items-center gap-1 rounded-lg border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
                   >
-                    ✎ Sửa thông tin
+                    <Edit2 size={16} /> Sửa thông tin
                   </button>
                   <button
                     type="button"
                     onClick={(e) => handleOpenDelete(selected, e)}
                     className="focus-ring inline-flex items-center gap-1 rounded-lg border border-offline/40 bg-offline/10 px-3 py-1 text-xs font-semibold text-offline hover:bg-offline/20 transition-colors"
                   >
-                    🗑 Xóa sinh viên
+                    <Trash2 size={16} className="inline -mt-0.5" /> Xóa sinh viên
                   </button>
                 </div>
               </div>
@@ -339,18 +340,20 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
                 <thead>
                   <tr className="border-b border-border text-left text-muted-foreground font-semibold">
                     <th className="px-3 py-2.5">Thời gian vào</th>
-                    <th className="px-3 py-2.5">Trạng thái</th>
+                    <th className="px-3 py-2.5">Thời gian ra</th>
                     <th className="px-3 py-2.5">Thời gian ở</th>
+                    <th className="px-3 py-2.5">Trạng thái</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
                   {history.map((h) => (
                     <tr key={h.id}>
                       <td className="px-3 py-2 text-foreground font-medium">{fmtDateTime(h.enteredAt)}</td>
+                      <td className="px-3 py-2 text-foreground font-medium">{h.exitedAt ? fmtDateTime(h.exitedAt) : "Đang ở"}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{fmtDuration(h.durationSeconds)}</td>
                       <td className="px-3 py-2">
                         <StatusBadge status={h.status} />
                       </td>
-                      <td className="px-3 py-2 text-muted-foreground">{fmtDuration(h.durationSeconds)}</td>
                     </tr>
                   ))}
                 </tbody>

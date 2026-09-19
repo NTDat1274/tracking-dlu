@@ -2,6 +2,7 @@
 // Cloud Connection Settings with Security Masking (Hide/Show toggle) & .env.local recommendation.
 import { useState } from "react";
 import { getCloudConfig, saveCloudConfig, testSupabaseConnection, type CloudConfig } from "../../lib/config";
+import { Shield, Check, AlertTriangle, EyeOff, Eye } from "lucide-react";
 
 export default function SettingsPage() {
   const [config, setConfig] = useState<CloudConfig>(() => getCloudConfig());
@@ -39,7 +40,7 @@ export default function SettingsPage() {
 
       {/* Security Advisory Notice */}
       <div className="rounded-2xl border border-secondary/40 bg-secondary/10 p-4 text-xs text-foreground flex items-start gap-3">
-        <span className="text-secondary text-base">🛡</span>
+        <Shield className="text-secondary" size={20} />
         <div className="space-y-1">
           <p className="font-bold text-secondary">Khuyến nghị Bảo mật Tối ưu:</p>
           <p className="text-muted-foreground">
@@ -52,7 +53,7 @@ export default function SettingsPage() {
 
       {savedSuccess && (
         <div className="rounded-xl border border-primary/40 bg-primary/10 p-4 text-xs font-semibold text-primary flex items-center gap-2 animate-fade-in-up">
-          <span>✓</span> Đã lưu cấu hình an toàn vào hệ thống. Các kết nối mới sẽ áp dụng ngay lập tức.
+          <Check size={16} className="inline" /> Đã lưu cấu hình an toàn vào hệ thống. Các kết nối mới sẽ áp dụng ngay lập tức.
         </div>
       )}
 
@@ -89,7 +90,7 @@ export default function SettingsPage() {
                   : "border-offline/40 bg-offline/10 text-offline"
               }`}
             >
-              <span>{testResult.success ? "✓" : "⚠"}</span>
+              <span className="flex items-center gap-1">{testResult.success ? <Check size={16} /> : <AlertTriangle size={16} />}</span>
               <span>{testResult.message}</span>
             </div>
           )}
@@ -118,7 +119,7 @@ export default function SettingsPage() {
                   onClick={() => setShowSupabaseKey(!showSupabaseKey)}
                   className="focus-ring flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
                 >
-                  <span>{showSupabaseKey ? "👁‍🗨 Ẩn key" : "👁 Hiện key"}</span>
+                  <span className="flex items-center gap-1">{showSupabaseKey ? <><EyeOff size={14}/> Ẩn key</> : <><Eye size={14}/> Hiện key</>}</span>
                 </button>
               </div>
               <div className="relative">
@@ -172,7 +173,7 @@ export default function SettingsPage() {
                   onClick={() => setShowCloudinaryKey(!showCloudinaryKey)}
                   className="focus-ring flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
                 >
-                  <span>{showCloudinaryKey ? "👁‍🗨 Ẩn" : "👁 Hiện"}</span>
+                  <span className="flex items-center gap-1">{showCloudinaryKey ? <><EyeOff size={14}/> Ẩn</> : <><Eye size={14}/> Hiện</>}</span>
                 </button>
               </div>
               <input

@@ -2,6 +2,7 @@
 // Filter bar for Students directory with dynamic Class Select.
 import type { StudentSortKey, SortDirection } from "../../../data/types";
 import { ClassSelect, ResetButton, SearchInput } from "./FilterAtoms";
+import { ArrowUp, ArrowDown } from "lucide-react";
 
 export interface StudentFilterState {
   searchQuery: string;
@@ -53,7 +54,7 @@ export default function StudentFilterBar({
           aria-label="Sắp xếp theo"
           value={filters.sortBy}
           onChange={(e) => onChange({ ...filters, sortBy: e.target.value as StudentSortKey })}
-          className="focus-ring rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs text-foreground"
+          className="focus-ring rounded-md border border-border bg-card px-2 py-1.5 text-sm text-foreground"
         >
           {SORT_OPTIONS.map((opt) => (
             <option key={opt.key} value={opt.key}>
@@ -68,9 +69,13 @@ export default function StudentFilterBar({
             onChange({ ...filters, sortDirection: filters.sortDirection === "asc" ? "desc" : "asc" })
           }
           aria-label="Đổi hướng sắp xếp"
-          className="focus-ring rounded-lg border border-border bg-card px-2.5 py-1.5 text-xs font-bold text-foreground hover:bg-muted"
+          className="focus-ring rounded-md border border-border bg-card px-2 py-1.5 text-sm text-foreground flex items-center gap-1 hover:bg-muted"
         >
-          {filters.sortDirection === "asc" ? "↑ Tăng dần" : "↓ Giảm dần"}
+          {filters.sortDirection === "asc" ? (
+            <><ArrowUp size={16} /> Tăng dần</>
+          ) : (
+            <><ArrowDown size={16} /> Giảm dần</>
+          )}
         </button>
 
         <ResetButton onClick={onReset} />

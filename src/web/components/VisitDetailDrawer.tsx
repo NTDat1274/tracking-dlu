@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { VisitRecord } from "../../data/types";
 import { fmtDateTime, fmtDuration } from "../../data/types";
 import StatusBadge from "./StatusBadge";
+import { X } from "lucide-react";
 import { SnapshotImage, StudentAvatar } from "./AvatarFallback";
 
 interface VisitDetailDrawerProps {
@@ -46,7 +47,7 @@ export default function VisitDetailDrawer({ record, onClose }: VisitDetailDrawer
                 onClick={onClose}
                 className="focus-ring rounded-md p-1 text-muted-foreground hover:bg-muted"
               >
-                ✕
+                <X size={18} />
               </button>
             </div>
 
@@ -174,7 +175,7 @@ export default function VisitDetailDrawer({ record, onClose }: VisitDetailDrawer
               setFullscreenImage(null);
             }}
           >
-            ✕
+            <X size={18} />
           </button>
         </div>
       )}

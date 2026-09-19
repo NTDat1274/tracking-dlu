@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { fetchVisitRecords } from "../../lib/supabase";
-import type { VisitRecord } from "../../data/types";
+import { fmtDuration, type VisitRecord } from "../../data/types";
 
 type ExportFormat = "CSV" | "PDF";
 const FORMATS: ExportFormat[] = ["CSV", "PDF"];
@@ -78,7 +78,7 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
     .reduce((sum, [k]) => sum + counts[k as keyof typeof counts], 0);
 
   function exportCSV() {
-    const headers = ["ID", "Mã SV", "Tên SV", "Lớp", "Giờ vào", "Giờ ra", "Thời lượng (s)", "Trạng thái"];
+    const headers = ["ID", "Mã SV", "Tên SV", "Lớp", "Giờ vào", "Giờ ra", "Thời lượng", "Trạng thái"];
     const rows = filteredRecords.map((r) => {
       const statusLabels: Record<string, string> = { Served: "Đã tiếp nhận", Waiting: "Đang chờ", Unattended: "Chưa tiếp nhận" };
       return [
@@ -88,7 +88,7 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
         r.className === "Unknown" ? "Chưa có" : r.className,
         r.enteredAt,
         r.exitedAt || "",
-        r.durationSeconds || "",
+        r.durationSeconds ? fmtDuration(r.durationSeconds) : "",
         statusLabels[r.status] || r.status,
       ];
     });
@@ -130,7 +130,8 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
     autoTable(doc, {
       startY: 25,
       styles: { font: "Roboto", fontStyle: "normal" },
-      head: [["ID", "Mã SV", "Tên SV", "Lớp", "Giờ vào", "Giờ ra", "Thời lượng (s)", "Trạng thái"]],
+      headStyles: { fillColor: [18, 113, 62] }, // DLU Green
+      head: [["ID", "Mã SV", "Tên SV", "Lớp", "Giờ vào", "Giờ ra", "Thời lượng", "Trạng thái"]],
       body: filteredRecords.map((r) => {
         const statusLabels: Record<string, string> = { Served: "Đã tiếp nhận", Waiting: "Đang chờ", Unattended: "Chưa tiếp nhận" };
         return [
@@ -140,7 +141,7 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
           r.className === "Unknown" ? "Chưa có" : r.className,
           new Date(r.enteredAt).toLocaleString(),
           r.exitedAt ? new Date(r.exitedAt).toLocaleString() : "",
-          r.durationSeconds || "",
+          r.durationSeconds ? fmtDuration(r.durationSeconds) : "",
           statusLabels[r.status] || r.status,
         ];
       }),

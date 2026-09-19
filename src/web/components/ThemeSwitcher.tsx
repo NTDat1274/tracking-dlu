@@ -1,6 +1,7 @@
 // src/web/components/ThemeSwitcher.tsx
 // Quick theme switcher button (Light / Dark).
 import { useTheme } from "../../context/ThemeContext";
+import { Sun, Moon } from "lucide-react";
 
 export default function ThemeSwitcher({ className = "" }: { className?: string }) {
   const { resolvedTheme, toggleTheme } = useTheme();
@@ -15,9 +16,9 @@ export default function ThemeSwitcher({ className = "" }: { className?: string }
       className={`focus-ring flex items-center justify-center rounded-xl border border-border bg-card p-2 text-foreground hover:bg-muted transition-colors shadow-xs ${className}`}
     >
       {isDark ? (
-        <span className="text-sm" aria-hidden="true">☀️</span>
+        <Sun size={16} aria-hidden="true" />
       ) : (
-        <span className="text-sm" aria-hidden="true">🌙</span>
+        <Moon size={16} aria-hidden="true" />
       )}
     </button>
   );

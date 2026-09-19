@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import WebSidebar from "./WebSidebar";
 import WebTopBar from "./WebTopBar";
+import { ChevronRight, ChevronLeft } from "lucide-react";
 import ExportModal from "./ExportModal";
 import OverviewPage from "../pages/OverviewPage";
 import AnalyticsPage from "../pages/AnalyticsPage";
@@ -183,7 +184,7 @@ export default function WebApp() {
         className="focus-ring fixed bottom-4 left-4 hidden rounded-full border border-border bg-card p-2 text-xs text-muted-foreground shadow-sm md:block xl:hidden"
         aria-label={sidebarCollapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
       >
-        {sidebarCollapsed ? "»" : "«"}
+        {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
       </button>
     </div>
   );

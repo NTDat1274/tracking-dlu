@@ -1,5 +1,6 @@
 // src/web/components/DataTable.tsx
 import type { ReactNode } from "react";
+import { ChevronUp, ChevronDown } from "lucide-react";
 
 export interface Column<T> {
   key: string;
@@ -49,7 +50,7 @@ export default function DataTable<T>({
                     >
                       {col.header}
                       <span aria-hidden="true" className={active ? "text-primary" : "text-border"}>
-                        {active ? (sortDir === "asc" ? "▲" : "▼") : "▲"}
+                        {active ? (sortDir === "asc" ? <ChevronUp size={14} className="inline" /> : <ChevronDown size={14} className="inline" />) : <ChevronUp size={14} className="inline opacity-20" />}
                       </span>
                     </button>
                   ) : (

@@ -10,6 +10,8 @@ interface PaginationProps {
   onPageSizeChange: (size: 10 | 25 | 50) => void;
 }
 
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
 export default function Pagination({
   page,
   totalPages,
@@ -50,7 +52,7 @@ export default function Pagination({
           aria-label="Trang trước"
           className="focus-ring rounded-md border border-border bg-card px-2.5 py-1 disabled:opacity-40"
         >
-          ←
+          <ChevronLeft size={16} />
         </button>
         <button
           type="button"
@@ -59,7 +61,7 @@ export default function Pagination({
           aria-label="Trang sau"
           className="focus-ring rounded-md border border-border bg-card px-2.5 py-1 disabled:opacity-40"
         >
-          →
+          <ChevronRight size={16} />
         </button>
       </div>
     </div>

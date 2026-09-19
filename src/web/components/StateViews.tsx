@@ -10,7 +10,7 @@ function Shell({
   action,
   tone = "default",
 }: {
-  icon: string;
+  icon: React.ReactNode;
   message: string;
   action?: ActionProps;
   tone?: "default" | "error" | "offline";
@@ -37,6 +37,8 @@ function Shell({
   );
 }
 
+import { SearchX, ServerCrash, AlertCircle } from "lucide-react";
+
 export function LoadingState({ message = "Đang tải dữ liệu..." }: { message?: string }) {
   return (
     <div className="flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-6 py-12 text-sm text-muted-foreground">
@@ -50,17 +52,17 @@ export function LoadingState({ message = "Đang tải dữ liệu..." }: { messa
 }
 
 export function EmptyState({ message, action }: { message: string; action?: ActionProps }) {
-  return <Shell icon="□" message={message} action={action} />;
+  return <Shell icon={<SearchX size={32} />} message={message} action={action} />;
 }
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return <Shell icon="!" message={message} tone="error" action={{ label: "Thử lại", onClick: onRetry }} />;
+  return <Shell icon={<AlertCircle size={32} />} message={message} tone="error" action={{ label: "Thử lại", onClick: onRetry }} />;
 }
 
 export function NoResultState({ message, onReset }: { message: string; onReset: () => void }) {
-  return <Shell icon="⌕" message={message} action={{ label: "Xóa bộ lọc", onClick: onReset }} />;
+  return <Shell icon={<SearchX size={32} />} message={message} action={{ label: "Xóa bộ lọc", onClick: onReset }} />;
 }
 
 export function OfflineState({ message }: { message: string }) {
-  return <Shell icon="○" message={message} tone="offline" />;
+  return <Shell icon={<ServerCrash size={32} />} message={message} tone="offline" />;
 }

@@ -3,7 +3,7 @@ import AnalyticsFilterBar, { type AnalyticsFilterState } from "../components/fil
 import BarChart from "../charts/BarChart";
 import DonutChart from "../charts/DonutChart";
 import HeatmapGrid from "../charts/HeatmapGrid";
-import { EmptyState } from "../components/StateViews";
+import { NoResultState } from "../components/StateViews";
 import { KpiSkeleton, TableSkeleton } from "../components/LoadingSkeleton";
 import { isWithinDateRange, type Insight, type VisitRecord, type CameraOption } from "../../data/types";
 import { fetchDistinctClasses, fetchDistinctCameras, fetchVisitRecords, subscribeToStudentRecords } from "../../lib/supabase";
@@ -152,9 +152,9 @@ export default function AnalyticsPage({ filters, onFiltersChange, onReset }: Ana
       />
 
       {filtered.length === 0 ? (
-        <EmptyState
+        <NoResultState
           message="Không có dữ liệu trong khoảng thời gian này."
-          action={{ label: "Reset bộ lọc", onClick: onReset }}
+          onReset={onReset}
         />
       ) : (
         <>

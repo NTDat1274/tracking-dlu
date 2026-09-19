@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { uploadImageToCloudinary } from "../../lib/cloudinary";
 import { upsertStudent } from "../../lib/supabase";
 import { StudentAvatar } from "./AvatarFallback";
+import { X } from "lucide-react";
 
 export interface StudentFormData {
   student_id: string;
@@ -32,7 +33,7 @@ function StudentModalForm({
   const [formData, setFormData] = useState<StudentFormData>(() => ({
     student_id: initialData?.student_id || "",
     full_name: initialData?.full_name || "",
-    class_name: initialData?.class_name || "CTK44",
+    class_name: initialData?.class_name || "",
     email: initialData?.email || "",
     portrait_url: initialData?.portrait_url || "",
   }));
@@ -128,7 +129,7 @@ function StudentModalForm({
           onClick={onClose}
           className="focus-ring rounded-lg border border-border p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
-          ✕
+          <X size={18} />
         </button>
       </div>
 

@@ -17,6 +17,7 @@ interface WebTopBarProps {
 }
 
 import ThemeSwitcher from "./ThemeSwitcher";
+import { Menu, Download } from "lucide-react";
 
 export default function WebTopBar({ page, onOpenDrawer, onExport }: WebTopBarProps) {
   const { user } = useAuth();
@@ -30,9 +31,9 @@ export default function WebTopBar({ page, onOpenDrawer, onExport }: WebTopBarPro
           type="button"
           onClick={onOpenDrawer}
           aria-label="Mở menu điều hướng"
-          className="focus-ring rounded-lg border border-border p-1.5 text-muted-foreground hover:bg-muted md:hidden"
+          className="focus-ring rounded-lg border border-border p-1.5 text-muted-foreground hover:bg-muted md:hidden flex items-center justify-center"
         >
-          ☰
+          <Menu size={20} />
         </button>
         <div>
           <h1 className="font-display text-base font-bold text-foreground sm:text-lg">
@@ -62,7 +63,7 @@ export default function WebTopBar({ page, onOpenDrawer, onExport }: WebTopBarPro
             onClick={onExport}
             className="focus-ring flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 shadow-sm transition-opacity"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+            <Download size={16} />
             Xuất báo cáo
           </button>
         )}

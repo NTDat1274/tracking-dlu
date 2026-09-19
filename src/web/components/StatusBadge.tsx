@@ -9,38 +9,40 @@ import type { VisitStatus, CameraStatus } from "../../data/types";
 export type NormalizedStatus = "Served" | "Waiting" | "Unattended" | CameraStatus;
 
 interface StatusConfig {
-  icon: string;
+  icon: React.ReactNode;
   className: string;
   label: string;
 }
 
 const CONFIG: Record<string, StatusConfig> = {
   Served: {
-    icon: "✓",
+    icon: <CheckCircle2 size={14} className="shrink-0" />,
     className: "bg-primary/15 text-primary border-primary/40",
     label: "Đã tiếp nhận",
   },
   Waiting: {
-    icon: "⏱",
+    icon: <Clock size={14} className="shrink-0" />,
     className: "bg-secondary/15 text-secondary border-secondary/40",
     label: "Đang chờ",
   },
   Unattended: {
-    icon: "✗",
+    icon: <XCircle size={14} className="shrink-0" />,
     className: "bg-offline/15 text-offline border-offline/40",
     label: "Chưa tiếp nhận",
   },
   Connected: {
-    icon: "●",
+    icon: <HelpCircle size={14} className="shrink-0" />,
     className: "bg-primary/15 text-primary border-primary/40",
     label: "Đã kết nối",
   },
   Offline: {
-    icon: "○",
+    icon: <Circle size={14} className="shrink-0" />,
     className: "bg-offline/15 text-offline border-offline/40",
     label: "Mất kết nối",
   },
 };
+
+import { CheckCircle2, Clock, XCircle, HelpCircle, Circle } from "lucide-react";
 
 export default function StatusBadge({ status }: { status: VisitStatus | CameraStatus | string }) {
   // Normalize any legacy status values into one of the 3 standard DLU statuses

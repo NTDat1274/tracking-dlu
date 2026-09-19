@@ -10,6 +10,7 @@ import { StudentAvatar } from "../components/AvatarFallback";
 import { fetchVisitRecords, subscribeToStudentRecords, fetchDistinctCameras } from "../../lib/supabase";
 import { getCloudConfig } from "../../lib/config";
 import { fmtDuration, fmtTime, type VisitRecord, type CameraOption } from "../../data/types";
+import { Clock } from "lucide-react";
 
 interface OverviewPageProps {
   onViewWaitingList: () => void;
@@ -229,7 +230,7 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
                       <td className="py-2.5 text-foreground">{fmtTime(occ.enteredAt)}</td>
                       <td className="py-2.5">
                         <span className="inline-flex items-center gap-1 rounded-md bg-secondary/15 px-2 py-0.5 font-mono text-xs font-bold text-secondary">
-                          <span>⏱</span>
+                          <Clock size={14} className="inline text-muted-foreground" />
                           {fmtDuration(liveSeconds)}
                         </span>
                       </td>
