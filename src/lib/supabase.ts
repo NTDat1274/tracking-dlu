@@ -369,13 +369,13 @@ export async function fetchDistinctCameras(): Promise<CameraOption[]> {
       let isOffline = d.status === "Offline";
       
       // Calculate age of heartbeat
-      if (d.last_active_at) {
-        const localIso = d.last_active_at.replace(/(Z|[+-]\d{2}:?\d{2})$/, '');
-        const lastActive = new Date(localIso).getTime();
-        if (now - lastActive > 15000) {
-           isOffline = true; // 15 seconds timeout
-        }
-      } else {
+        if (d.last_active_at) {
+          // Parse directly so the 'Z' or '+00:00' is respected and converted to correct epoch time
+          const lastActive = new Date(d.last_active_at).getTime();
+          if (now - lastActive > 15000) {
+             isOffline = true; // 15 seconds timeout
+          }
+        } else {
         isOffline = true;
       }
 
