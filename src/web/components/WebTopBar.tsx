@@ -26,23 +26,23 @@ export default function WebTopBar({ page, onOpenDrawer, onExport }: WebTopBarPro
 
   return (
     <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3 shadow-xs">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-1 items-center gap-3 min-w-0 pr-2">
         <button
           type="button"
           onClick={onOpenDrawer}
           aria-label="Mở menu điều hướng"
-          className="focus-ring rounded-lg border border-border p-1.5 text-muted-foreground hover:bg-muted md:hidden flex items-center justify-center"
+          className="focus-ring rounded-lg border border-border p-1.5 text-muted-foreground hover:bg-muted md:hidden flex shrink-0 items-center justify-center"
         >
           <Menu size={20} />
         </button>
-        <div>
-          <h1 className="font-display text-base font-bold text-foreground sm:text-lg">
+        <div className="min-w-0">
+          <h1 className="font-display text-base font-bold text-foreground sm:text-lg truncate">
             {TITLES[page] || "Hệ thống Quản lý"}
           </h1>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-3">
         {/* Theme Switcher Button */}
         <ThemeSwitcher />
 

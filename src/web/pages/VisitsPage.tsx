@@ -8,7 +8,9 @@ import StatusBadge from "../components/StatusBadge";
 import { EmptyState, NoResultState } from "../components/StateViews";
 import { TableSkeleton } from "../components/LoadingSkeleton";
 import { StudentAvatar } from "../components/AvatarFallback";
-import { fetchVisitRecords, fetchDistinctClasses, fetchDistinctCameras, subscribeToStudentRecords } from "../../lib/supabase";
+import ConfirmDialog from "../components/ConfirmDialog";
+import { Trash2 } from "lucide-react";
+import { fetchVisitRecords, fetchDistinctClasses, fetchDistinctCameras, subscribeToStudentRecords, deleteVisitRecord } from "../../lib/supabase";
 import {
   fmtDuration,
   fmtTime,
@@ -51,6 +53,15 @@ export default function VisitsPage({
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<VisitSortKey>("enteredAt");
   const [sortDir, setSortDir] = useState<SortDirection>("desc");
+  const [deleteCandidate, setDeleteCandidate] = useState<VisitRecord | null>(null);
+
+  async function handleConfirmDelete() {
+    if (!deleteCandidate) return;
+    const targetId = deleteCandidate.id;
+    await deleteVisitRecord(targetId);
+    setRecords((prev) => prev.filter((r) => r.id !== targetId));
+    setDeleteCandidate(null);
+  }
 
   // Load from Supabase + Subscribe Realtime
   useEffect(() => {
@@ -169,18 +180,31 @@ export default function VisitsPage({
     {
       key: "actions",
       header: "Thao tác",
-      className: "whitespace-nowrap w-24 text-right",
+      className: "whitespace-nowrap w-32 text-right",
       render: (r) => (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onSelectRecord(r);
-          }}
-          className="focus-ring rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/20 transition-colors"
-        >
-          Xem chi tiết →
-        </button>
+        <div className="flex items-center justify-end gap-1.5">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelectRecord(r);
+            }}
+            className="focus-ring rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/20 transition-colors"
+          >
+            Xem chi tiết →
+          </button>
+          <button
+            type="button"
+            title="Xóa log"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeleteCandidate(r);
+            }}
+            className="focus-ring flex items-center justify-center rounded-md border border-offline/40 bg-offline/10 p-1 text-offline hover:bg-offline/20 transition-colors h-[26px] w-[26px]"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
       ),
     },
   ];
@@ -223,6 +247,17 @@ export default function VisitsPage({
           />
         </div>
       )}
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        open={Boolean(deleteCandidate)}
+        title="Xóa bản ghi"
+        message={`Bạn có chắc chắn muốn xóa bản ghi lịch sử ra vào của ${deleteCandidate?.studentName}?`}
+        confirmLabel="Xóa"
+        danger
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteCandidate(null)}
+      />
     </div>
   );
 }

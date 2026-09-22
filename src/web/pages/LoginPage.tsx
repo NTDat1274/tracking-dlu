@@ -42,7 +42,7 @@ export default function LoginPage() {
           </div>
 
           <h1 className="mt-4 font-display text-xl font-bold tracking-tight text-foreground">
-            HỆ THỐNG QUẢN LÝ SINH VIÊN
+            Hệ thống quản lý sinh viên
           </h1>
           <p className="mt-1 text-xs text-muted-foreground">
             Trường Đại học Đà Lạt · TrackingZ AI Admin Portal
@@ -50,29 +50,31 @@ export default function LoginPage() {
           <div className="page-title-accent mt-2" />
         </div>
 
-        {sessionExpiredMsg && (
+        {sessionExpiredMsg ? (
           <div className="mt-5 rounded-xl border border-secondary/50 bg-secondary/10 p-3 text-xs text-secondary flex items-start gap-2">
             <Shield size={16} className="shrink-0 mt-0.5" />
             <span>{sessionExpiredMsg}</span>
           </div>
-        )}
+        ) : null}
 
-        {errorMsg && (
+        {errorMsg ? (
           <div className="mt-4 rounded-xl border border-offline/40 bg-offline/10 p-3 text-xs text-offline flex items-center gap-2">
             <AlertTriangle size={16} className="shrink-0" />
             <span>{errorMsg}</span>
           </div>
-        )}
+        ) : null}
 
         {/* Login Form */}
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-foreground mb-1.5">
+            <label htmlFor="email" className="block text-xs font-semibold text-foreground mb-1.5">
               Email Quản trị viên
             </label>
             <input
+              id="email"
               type="email"
               required
+              autoComplete="username email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@dlu.edu.vn"
@@ -82,7 +84,7 @@ export default function LoginPage() {
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-semibold text-foreground">
+              <label htmlFor="password" className="block text-xs font-semibold text-foreground">
                 Mật khẩu
               </label>
               <button
@@ -95,8 +97,10 @@ export default function LoginPage() {
             </div>
 
             <input
+              id="password"
               type={showPassword ? "text" : "password"}
               required
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
@@ -109,7 +113,7 @@ export default function LoginPage() {
             disabled={loading}
             className="focus-ring mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground hover:opacity-90 shadow-md disabled:opacity-50 transition-all"
           >
-            {loading && <span className="h-4 w-4 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />}
+            {loading ? <span className="h-4 w-4 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" /> : null}
             {loading ? "Đang xác thực..." : "Đăng nhập hệ thống"}
           </button>
         </form>

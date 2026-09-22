@@ -282,16 +282,16 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
 
       {/* Selected Student Detail Panel */}
       {selected && (
-        <div className="rounded-2xl border border-border bg-card p-6 shadow-sm animate-fade-in-up">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-4">
+          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm animate-fade-in-up">
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4 flex-wrap min-w-0">
               <StudentAvatar src={selected.portraitUrl} name={selected.name} size="xl" />
-              <div>
-                <h3 className="font-display text-lg font-bold text-foreground">{selected.name}</h3>
-                <p className="text-xs text-muted-foreground">
+              <div className="min-w-0">
+                <h3 className="font-display text-lg font-bold text-foreground truncate">{selected.name}</h3>
+                <p className="text-xs text-muted-foreground truncate">
                   MSSV: <span className="font-mono text-primary font-bold">{selected.studentId}</span> · Lớp / Khoa: {selected.className}
                 </p>
-                <div className="mt-2 flex gap-2">
+                <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={(e) => handleOpenEdit(selected, e)}
@@ -336,7 +336,7 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
             {history.length === 0 ? (
               <p className="p-4 text-xs text-muted-foreground text-center">Chưa có lượt đến nào được ghi nhận.</p>
             ) : (
-              <table className="w-full text-xs">
+              <table className="w-full min-w-[500px] text-xs">
                 <thead>
                   <tr className="border-b border-border text-left text-muted-foreground font-semibold">
                     <th className="px-3 py-2.5">Thời gian vào</th>

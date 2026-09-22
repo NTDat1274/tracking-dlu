@@ -11,7 +11,7 @@ export function DateRangeFilter({
   onChange: (from: string, to: string) => void;
 }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <label className="sr-only" htmlFor="date-from">
         Từ ngày
       </label>
@@ -136,7 +136,7 @@ export function SearchInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="focus-ring w-56 rounded-md border border-border bg-card px-3 py-1.5 text-sm"
+      className="focus-ring w-full sm:w-56 rounded-md border border-border bg-card px-3 py-1.5 text-sm"
     />
   );
 }

@@ -126,6 +126,7 @@ function StudentModalForm({
         </div>
         <button
           type="button"
+          aria-label="Đóng"
           onClick={onClose}
           className="focus-ring rounded-lg border border-border p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
@@ -133,11 +134,11 @@ function StudentModalForm({
         </button>
       </div>
 
-      {errorMsg && (
+      {errorMsg ? (
         <div className="mt-4 rounded-lg border border-offline/40 bg-offline/10 p-3 text-xs text-offline">
           {errorMsg}
         </div>
-      )}
+      ) : null}
 
       <form onSubmit={handleSubmit} className="mt-5 space-y-4">
         {/* Portrait Photo Upload & Preview */}
@@ -176,10 +177,11 @@ function StudentModalForm({
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="block text-xs font-semibold text-foreground mb-1">
+            <label htmlFor="student_id" className="block text-xs font-semibold text-foreground mb-1">
               Mã sinh viên (MSSV) <span className="text-offline">*</span>
             </label>
             <input
+              id="student_id"
               type="text"
               required
               disabled={isEditing}
@@ -191,10 +193,11 @@ function StudentModalForm({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-foreground mb-1">
+            <label htmlFor="class_name" className="block text-xs font-semibold text-foreground mb-1">
               Lớp / Khóa
             </label>
             <input
+              id="class_name"
               type="text"
               placeholder="VD: CTK44, CTK45"
               value={formData.class_name}
@@ -205,10 +208,11 @@ function StudentModalForm({
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-foreground mb-1">
+          <label htmlFor="full_name" className="block text-xs font-semibold text-foreground mb-1">
             Họ và tên sinh viên <span className="text-offline">*</span>
           </label>
           <input
+            id="full_name"
             type="text"
             required
             placeholder="VD: Nguyễn Văn An"
@@ -219,10 +223,11 @@ function StudentModalForm({
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-foreground mb-1">
+          <label htmlFor="email" className="block text-xs font-semibold text-foreground mb-1">
             Email liên hệ
           </label>
           <input
+            id="email"
             type="email"
             placeholder="VD: 2212390@dlu.edu.vn"
             value={formData.email}
@@ -245,7 +250,7 @@ function StudentModalForm({
             disabled={isSubmitting}
             className="focus-ring flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-opacity"
           >
-            {isSubmitting && <span className="h-3 w-3 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" />}
+            {isSubmitting ? <span className="h-3 w-3 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" /> : null}
             {isSubmitting ? "Đang xử lý & Tải ảnh..." : isEditing ? "Lưu thay đổi" : "Lưu sinh viên"}
           </button>
         </div>

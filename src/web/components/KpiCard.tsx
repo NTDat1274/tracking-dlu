@@ -13,7 +13,7 @@ interface KpiCardProps {
 export default function KpiCard({ label, value, sub, dateContext, accent, icon }: KpiCardProps) {
   return (
     <div className="rounded-lg border border-border bg-card p-4">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-2">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           {label}
         </span>

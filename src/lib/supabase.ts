@@ -425,3 +425,23 @@ export function subscribeToStudentRecords(
     return { unsubscribe: () => {} };
   }
 }
+
+export async function deleteVisitRecord(id: string): Promise<{ success: boolean; error?: string }> {
+  localRecords = localRecords.filter((r) => r.id !== id);
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: true };
+  }
+
+  try {
+    const { error } = await client.from('student_records').delete().eq('id', id);
+    if (error) {
+      console.error('Supabase deleteVisitRecord error:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Unknown error' };
+  }
+}

@@ -61,6 +61,7 @@ export default function WebSidebar({
                 key={item.key}
                 type="button"
                 title={item.label}
+                aria-label={item.label}
                 aria-current={active ? "page" : undefined}
                 onClick={() => {
                   onNavigate(item.key);
@@ -96,6 +97,7 @@ export default function WebSidebar({
             onCloseDrawer();
           }}
           title="Đăng xuất"
+          aria-label="Đăng xuất"
           className={`focus-ring flex w-full items-center gap-2.5 rounded-xl border border-offline/30 bg-offline/10 px-3 py-2 text-xs font-semibold text-offline hover:bg-offline/20 transition-colors ${
             collapsed ? "justify-center" : ""
           }`}

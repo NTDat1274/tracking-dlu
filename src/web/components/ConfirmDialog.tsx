@@ -57,9 +57,9 @@ export default function ConfirmDialog({
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
-      className="rounded-lg border border-border bg-card p-0 shadow-xl backdrop:bg-black/40"
+      className="m-auto rounded-lg border border-border bg-card p-0 shadow-xl backdrop:bg-black/40"
     >
-      <div onClick={(e) => e.stopPropagation()} className="w-[360px] p-5">
+      <div onClick={(e) => e.stopPropagation()} className="w-[85vw] max-w-[360px] p-5">
         <h2 id="confirm-dialog-title" className="font-display text-base font-semibold text-foreground">
           {title}
         </h2>

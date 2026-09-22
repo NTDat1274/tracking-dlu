@@ -16,13 +16,13 @@ export default function DonutChart({ data, title }: { data: DonutSlice[]; title:
   }, []);
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex flex-col sm:flex-row items-center sm:items-start justify-center gap-4 sm:gap-6">
       <svg
         role="img"
         aria-labelledby={`${title}-title`}
         aria-describedby={`${title}-desc`}
         viewBox="0 0 40 40"
-        className="h-32 w-32"
+        className="h-32 w-32 shrink-0"
       >
         <title id={`${title}-title`}>{title}</title>
         <desc id={`${title}-desc`}>
@@ -56,12 +56,12 @@ export default function DonutChart({ data, title }: { data: DonutSlice[]; title:
         })}
       </svg>
 
-      <ul className="space-y-1.5 text-sm">
+      <ul className="space-y-1.5 text-sm w-full sm:w-auto self-start sm:self-auto">
         {data.map((slice) => (
-          <li key={slice.label} className="flex items-center gap-2">
+          <li key={slice.label} className="flex items-center gap-2 whitespace-nowrap">
             <span
               aria-hidden="true"
-              className="h-2.5 w-2.5 rounded-full"
+              className="h-2.5 w-2.5 rounded-full shrink-0"
               style={{ backgroundColor: slice.color }}
             />
             <span className="text-foreground">{slice.label}</span>

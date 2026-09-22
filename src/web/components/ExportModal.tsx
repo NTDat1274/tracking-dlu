@@ -177,7 +177,7 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
       }}
       className="m-auto rounded-lg border border-border bg-card p-0 shadow-xl backdrop:bg-black/40"
     >
-      <div onClick={(e) => e.stopPropagation()} className="w-[380px] p-5">
+      <div onClick={(e) => e.stopPropagation()} className="w-[85vw] max-w-[380px] p-5">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Xuất Dữ Liệu</p>
         <h2 id="export-dialog-title" className="font-display text-base font-semibold text-foreground">
           Xuất Event Log

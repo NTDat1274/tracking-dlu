@@ -66,7 +66,14 @@ export default function DataTable<T>({
             <tr
               key={rowKey(row)}
               onClick={() => onRowClick?.(row)}
-              className={`border-b border-border-subtle last:border-0 ${i % 2 === 1 ? "bg-muted/40" : ""} ${onRowClick ? "cursor-pointer hover:bg-primary/5" : ""}`}
+              tabIndex={onRowClick ? 0 : undefined}
+              onKeyDown={(e) => {
+                if (onRowClick && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault();
+                  onRowClick(row);
+                }
+              }}
+              className={`border-b border-border-subtle last:border-0 ${i % 2 === 1 ? "bg-muted/40" : ""} ${onRowClick ? "cursor-pointer hover:bg-primary/5 focus-visible:bg-primary/5 focus-visible:outline-hidden" : ""}`}
             >
               {columns.map((col) => (
                 <td key={col.key} className={`px-3 py-2.5 ${col.className ?? ""}`}>

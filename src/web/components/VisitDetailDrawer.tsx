@@ -38,7 +38,7 @@ export default function VisitDetailDrawer({ record, onClose }: VisitDetailDrawer
         />
 
         <div className="absolute inset-y-0 right-0 flex max-w-full">
-          <div className="w-full w-[400px] transform bg-card shadow-2xl transition-transform duration-300 sm:w-[450px]">
+          <div className="w-[85vw] max-w-[400px] transform bg-card shadow-2xl transition-transform duration-300 sm:w-[450px] sm:max-w-[450px]">
             {/* Drawer Header */}
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
               <h2 className="font-display text-sm font-bold text-foreground">Chi tiết bản ghi</h2>
@@ -54,28 +54,28 @@ export default function VisitDetailDrawer({ record, onClose }: VisitDetailDrawer
             {/* Drawer Body */}
             <div className="h-[calc(100vh-65px)] overflow-y-auto p-5 space-y-6">
               {/* Student Info Card */}
-              <div className="flex w-full items-center justify-between rounded-xl border border-border/80 bg-background/60 p-4">
-                <div className="flex w-2/3 items-center gap-3 pr-2">
+              <div className="flex flex-col sm:flex-row w-full items-start sm:items-center justify-between gap-3 rounded-xl border border-border/80 bg-background/60 p-4">
+                <div className="flex items-center gap-3 w-full sm:w-auto min-w-0 pr-0 sm:pr-2">
                   <StudentAvatar
                     src={record.avatarUrl}
                     name={record.studentName}
                     size="lg"
                   />
-                  <div className="flex-1 overflow-hidden">
+                  <div className="flex-1 min-w-0">
                     <p className="font-display text-base font-bold text-foreground break-words leading-tight">
                       {record.studentName}
                     </p>
                     <div className="mt-1.5 space-y-0.5">
-                      <p className="text-xs text-muted-foreground">
-                        Mã SV: <span className="font-mono text-primary font-bold">{record.studentId}</span>
+                      <p className="text-xs font-medium text-muted-foreground flex gap-2">
+                        MSSV: <span className="font-mono text-foreground font-bold">{record.studentId}</span>
                       </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        Lớp: {record.className === "Unknown" ? "Chưa có" : record.className}
+                      <p className="text-xs font-medium text-muted-foreground flex gap-2">
+                        Lớp: <span className="text-foreground">{record.className}</span>
                       </p>
                     </div>
                   </div>
                 </div>
-                <div className="flex w-1/3 justify-end items-center">
+                <div className="flex sm:justify-end items-center shrink-0">
                   <StatusBadge status={record.status} />
                 </div>
               </div>
