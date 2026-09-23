@@ -10,7 +10,7 @@ import { StudentAvatar } from "../components/AvatarFallback";
 import { fetchVisitRecords, subscribeToStudentRecords, fetchDistinctCameras } from "../../lib/supabase";
 import { getCloudConfig } from "../../lib/config";
 import { fmtDuration, fmtTime, type VisitRecord, type CameraOption } from "../../data/types";
-import { Clock } from "lucide-react";
+import { Clock, ArrowRight } from "lucide-react";
 
 interface OverviewPageProps {
   onViewWaitingList: () => void;
@@ -118,6 +118,10 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
     (r) => !r.exitedAt || r.status === "Waiting"
   );
 
+  const todayStr = new Date().toDateString();
+  const todayRecords = records.filter((r) => new Date(r.enteredAt).toDateString() === todayStr);
+  const totalVisitsToday = todayRecords.length;
+
   const servedRecords = records.filter((r) => r.status === "Served");
   const waitingRecords = records.filter((r) => r.status === "Waiting");
   const unattendedRecords = records.filter((r) => r.status === "Unattended");
@@ -139,7 +143,7 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           label="Tổng lượt đến hôm nay"
-          value={String(totalVisits)}
+          value={String(totalVisitsToday)}
           sub="Hệ thống camera ghi nhận"
           accent="#9ABE26"
         />
@@ -183,9 +187,9 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
           <button
             type="button"
             onClick={onViewWaitingList}
-            className="focus-ring text-xs font-semibold text-primary hover:underline"
+            className="focus-ring flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
           >
-            Xem danh sách chờ →
+            Xem danh sách chờ <ArrowRight size={14} className="inline -mt-0.5" />
           </button>
         </div>
 

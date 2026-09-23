@@ -10,7 +10,7 @@ import StatusBadge from "../components/StatusBadge";
 import StudentModal, { type StudentFormData } from "../components/StudentModal";
 import { fetchStudents, deleteStudentCascade, fetchVisitRecords, fetchDistinctClasses } from "../../lib/supabase";
 import { fmtDateTime, fmtDuration, isWaitingTooLong, type StudentSummary, type VisitRecord } from "../../data/types";
-import { Trash2, AlertTriangle, Edit2 } from "lucide-react";
+import { Trash2, AlertTriangle, Edit2, Plus } from "lucide-react";
 
 interface StudentsPageProps {
   filters: StudentFilterState;
@@ -196,7 +196,7 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
           onClick={handleOpenAdd}
           className="focus-ring flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:opacity-90 shadow-sm transition-opacity"
         >
-          <span className="text-sm font-black">+</span>
+          <Plus size={16} className="shrink-0" />
           Thêm Sinh Viên Mới
         </button>
       </div>
@@ -339,10 +339,10 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
               <table className="w-full min-w-[500px] text-xs">
                 <thead>
                   <tr className="border-b border-border text-left text-muted-foreground font-semibold">
-                    <th className="px-3 py-2.5">Thời gian vào</th>
-                    <th className="px-3 py-2.5">Thời gian ra</th>
-                    <th className="px-3 py-2.5">Thời gian ở</th>
-                    <th className="px-3 py-2.5">Trạng thái</th>
+                    <th className="px-3 py-2.5 w-1/4">Thời gian vào</th>
+                    <th className="px-3 py-2.5 w-1/4">Thời gian ra</th>
+                    <th className="px-3 py-2.5 w-1/4">Thời gian ở</th>
+                    <th className="px-3 py-2.5 w-1/4">Trạng thái</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">

@@ -9,7 +9,7 @@ import { EmptyState, NoResultState } from "../components/StateViews";
 import { TableSkeleton } from "../components/LoadingSkeleton";
 import { StudentAvatar } from "../components/AvatarFallback";
 import ConfirmDialog from "../components/ConfirmDialog";
-import { Trash2 } from "lucide-react";
+import { Trash2, Eye } from "lucide-react";
 import { fetchVisitRecords, fetchDistinctClasses, fetchDistinctCameras, subscribeToStudentRecords, deleteVisitRecord } from "../../lib/supabase";
 import {
   fmtDuration,
@@ -180,18 +180,19 @@ export default function VisitsPage({
     {
       key: "actions",
       header: "Thao tác",
-      className: "whitespace-nowrap w-32 text-right",
+      className: "whitespace-nowrap w-24 text-right",
       render: (r) => (
         <div className="flex items-center justify-end gap-1.5">
           <button
             type="button"
+            title="Xem chi tiết"
             onClick={(e) => {
               e.stopPropagation();
               onSelectRecord(r);
             }}
-            className="focus-ring rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/20 transition-colors"
+            className="focus-ring flex items-center justify-center rounded-md border border-primary/40 bg-primary/10 p-1 text-primary hover:bg-primary/20 transition-colors h-[26px] w-[26px]"
           >
-            Xem chi tiết →
+            <Eye size={14} />
           </button>
           <button
             type="button"

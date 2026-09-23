@@ -184,7 +184,7 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
         </h2>
 
         <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Khoảng ngày</p>
-        <div className="mt-1.5 flex gap-2">
+        <div className="mt-1.5 flex flex-col sm:flex-row gap-2">
           <label className="flex-1 text-xs">
             <span className="text-muted-foreground">Từ ngày</span>
             <input

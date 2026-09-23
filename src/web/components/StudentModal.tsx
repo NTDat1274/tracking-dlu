@@ -114,8 +114,8 @@ function StudentModalForm({
   }
 
   return (
-    <div className="relative w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl animate-fade-in-up">
-      <div className="flex items-center justify-between border-b border-border/80 pb-4">
+    <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl border border-border bg-card shadow-2xl animate-fade-in-up">
+      <div className="flex items-center justify-between border-b border-border/80 p-6 pb-4 shrink-0">
         <div>
           <h2 className="font-display text-lg font-bold text-foreground">
             {isEditing ? "Chỉnh sửa thông tin sinh viên" : "Đăng ký sinh viên mới"}
@@ -134,7 +134,8 @@ function StudentModalForm({
         </button>
       </div>
 
-      {errorMsg ? (
+      <div className="overflow-y-auto p-6 pt-4 space-y-4">
+        {errorMsg ? (
         <div className="mt-4 rounded-lg border border-offline/40 bg-offline/10 p-3 text-xs text-offline">
           {errorMsg}
         </div>
@@ -255,6 +256,7 @@ function StudentModalForm({
           </button>
         </div>
       </form>
+      </div>
     </div>
   );
 }
