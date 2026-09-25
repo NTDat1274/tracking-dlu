@@ -1,5 +1,5 @@
 // src/context/AuthContext.tsx
-// Supabase Authentication với tính năng Tự động Đăng xuất sau 15 phút không hoạt động.
+// Supabase Authentication với tính năng Phân quyền Vai trò (Admin / Student) và Tự động Đăng xuất sau 15 phút.
 import React, {
   createContext,
   useEffect,
@@ -8,17 +8,25 @@ import React, {
   useCallback,
 } from "react";
 import type { User, Session } from "@supabase/supabase-js";
-import { getSupabaseClient } from "../lib/supabase";
+import { getSupabaseClient, fetchUserAccount } from "../lib/supabase";
+import type { AccountRecord, UserRole } from "../data/types";
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
+  account: AccountRecord | null;
+  role: UserRole | null;
   loading: boolean;
   signIn: (
     email: string,
     password: string,
   ) => Promise<{ success: boolean; error?: string }>;
+  signUp: (
+    email: string,
+    password: string,
+  ) => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
+  refreshAccount: () => Promise<void>;
   sessionExpiredMsg: string | null;
   clearSessionExpiredMsg: () => void;
 }
@@ -35,6 +43,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [account, setAccount] = useState<AccountRecord | null>(null);
+  const [role, setRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
   const [sessionExpiredMsg, setSessionExpiredMsg] = useState<string | null>(
     null,
@@ -42,6 +52,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const lastActivityRef = useRef<number>(Date.now());
   const idleTimerRef = useRef<number | null>(null);
+
+  const loadAccount = useCallback(async (userId: string, userEmail?: string) => {
+    const acc = await fetchUserAccount(userId);
+    if (acc) {
+      setAccount(acc);
+      setRole(acc.role);
+    } else {
+      // Xác định role khởi tạo dựa trên email hoặc mặc định
+      const client = getSupabaseClient();
+      const isAdminEmail = userEmail
+        ? userEmail.toLowerCase().includes("admin")
+        : false;
+      const initialRole: UserRole = isAdminEmail ? "admin" : "student";
+      const fallbackAcc: AccountRecord = {
+        id: userId,
+        email: userEmail || "",
+        role: initialRole,
+        student_id: null,
+      };
+
+      if (client) {
+        try {
+          await client.from("accounts").upsert({
+            id: userId,
+            email: userEmail || "",
+            role: initialRole,
+          });
+        } catch (err) {
+          console.warn("Chưa thể tự động ghi vào bảng accounts:", err);
+        }
+      }
+
+      setAccount(fallbackAcc);
+      setRole(initialRole);
+    }
+  }, []);
+
+  const refreshAccount = useCallback(async () => {
+    if (user) {
+      await loadAccount(user.id, user.email ?? undefined);
+    }
+  }, [user, loadAccount]);
 
   const signOutInternal = useCallback(async (reason?: string) => {
     const client = getSupabaseClient();
@@ -54,6 +106,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     setUser(null);
     setSession(null);
+    setAccount(null);
+    setRole(null);
 
     if (reason) {
       setSessionExpiredMsg(reason);
@@ -64,7 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     await signOutInternal();
   }, [signOutInternal]);
 
-  // Kiếm tra phiên đăng nhập ban đầu từ Supabase
+  // Kiểm tra phiên đăng nhập ban đầu từ Supabase
   useEffect(() => {
     let mounted = true;
 
@@ -78,16 +132,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       try {
         const { data } = await client.auth.getSession();
         if (mounted) {
+          if (data.session?.user) {
+            await loadAccount(
+              data.session.user.id,
+              data.session.user.email ?? undefined,
+            );
+          }
           setSession(data.session);
           setUser(data.session?.user ?? null);
           setLoading(false);
         }
 
         const { data: listener } = client.auth.onAuthStateChange(
-          (_event, newSession) => {
+          async (_event, newSession) => {
             if (mounted) {
-              setSession(newSession);
-              setUser(newSession?.user ?? null);
+              if (newSession?.user) {
+                await loadAccount(
+                  newSession.user.id,
+                  newSession.user.email ?? undefined,
+                );
+                setSession(newSession);
+                setUser(newSession.user);
+              } else {
+                setSession(null);
+                setUser(null);
+                setAccount(null);
+                setRole(null);
+              }
             }
           },
         );
@@ -106,7 +177,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [loadAccount]);
 
   // Bộ đếm Inactivity Idle Timer (Tự động đăng xuất sau 15 phút)
   useEffect(() => {
@@ -180,13 +251,77 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         return { success: false, error: error.message };
       }
 
-      setUser(data.user);
+      if (data.user) {
+        await loadAccount(data.user.id, data.user.email ?? undefined);
+      }
       setSession(data.session);
+      setUser(data.user);
       return { success: true };
     } catch (err: any) {
       return {
         success: false,
         error: err?.message || "Lỗi đăng nhập hệ thống",
+      };
+    }
+  };
+
+  // Đăng ký tài khoản sinh viên mới trên Supabase
+  const signUp = async (
+    email: string,
+    password: string,
+  ): Promise<{ success: boolean; error?: string }> => {
+    setSessionExpiredMsg(null);
+    lastActivityRef.current = Date.now();
+    const trimmedEmail = email.trim();
+    const client = getSupabaseClient();
+
+    if (!client) {
+      return {
+        success: false,
+        error:
+          "Chưa cấu hình Supabase! Vui lòng cài đặt Supabase URL & Key trong trang Cấu hình.",
+      };
+    }
+
+    try {
+      const { data, error } = await client.auth.signUp({
+        email: trimmedEmail,
+        password,
+        options: {
+          data: {
+            role: "student",
+          },
+        },
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data.user) {
+        // Tự động tạo bản ghi trong accounts với role 'student'
+        try {
+          await client.from("accounts").upsert({
+            id: data.user.id,
+            email: trimmedEmail,
+            role: "student",
+          });
+        } catch (insertErr) {
+          console.warn("Chưa thể tự động ghi vào accounts khi signUp:", insertErr);
+        }
+      }
+
+      if (data.session && data.user) {
+        await loadAccount(data.user.id, trimmedEmail);
+        setSession(data.session);
+        setUser(data.user);
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err?.message || "Lỗi đăng ký tài khoản sinh viên",
       };
     }
   };
@@ -198,9 +333,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       value={{
         user,
         session,
+        account,
+        role,
         loading,
         signIn,
+        signUp,
         signOut,
+        refreshAccount,
         sessionExpiredMsg,
         clearSessionExpiredMsg,
       }}

@@ -11,6 +11,7 @@ import VisitsPage from "../pages/VisitsPage";
 import StudentsPage from "../pages/StudentsPage";
 import SettingsPage from "../pages/SettingsPage";
 import LoginPage from "../pages/LoginPage";
+import StudentPortalPage from "../pages/StudentPortalPage";
 import VisitDetailDrawer from "./VisitDetailDrawer";
 import { useAuth } from "../../context/AuthContext";
 import type { AnalyticsFilterState } from "./filters/AnalyticsFilterBar";
@@ -53,11 +54,12 @@ const DEFAULT_STUDENT_FILTERS: StudentFilterState = {
 };
 
 export default function WebApp() {
-  const { user, loading } = useAuth();
+  const { user, loading, role } = useAuth();
   const [page, setPage] = useState<WebPage>("overview");
   const [modal, setModal] = useState<WebModal>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [previewStudentPortal, setPreviewStudentPortal] = useState(false);
 
   // Selected visit record for slide-over drawer
   const [selectedRecord, setSelectedRecord] = useState<VisitRecord | null>(null);
@@ -80,8 +82,8 @@ export default function WebApp() {
     [sidebarCollapsed]
   );
 
-  // Loading Screen while auth state is resolving
-  if (loading) {
+  // Loading Screen while auth state or role is resolving
+  if (loading || (user && !role)) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
@@ -89,7 +91,7 @@ export default function WebApp() {
             DLU
           </div>
           <p className="text-xs font-semibold text-muted-foreground animate-pulse">
-            Đang khởi tạo hệ thống TrackingZ...
+            Đang xác thực quyền truy cập hệ thống...
           </p>
         </div>
       </div>
@@ -98,6 +100,20 @@ export default function WebApp() {
 
   // Protected Route Guard: If not logged in, render LoginPage
   if (!user) {
+    return <LoginPage />;
+  }
+
+  // Student Route Guard or Admin Preview
+  if (role === "student" || previewStudentPortal) {
+    return (
+      <StudentPortalPage
+        onBackToAdmin={() => setPreviewStudentPortal(false)}
+      />
+    );
+  }
+
+  // Only render Admin Dashboard if role is strictly 'admin'
+  if (role !== "admin") {
     return <LoginPage />;
   }
 
@@ -116,6 +132,7 @@ export default function WebApp() {
           page={page}
           onOpenDrawer={() => setDrawerOpen(true)}
           onExport={() => setModal("export")}
+          onOpenStudentPortal={() => setPreviewStudentPortal(true)}
         />
 
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
@@ -181,7 +198,7 @@ export default function WebApp() {
       <button
         type="button"
         onClick={() => setSidebarCollapsed((c) => !c)}
-        className="focus-ring fixed bottom-4 left-4 hidden rounded-full border border-border bg-card p-2 text-xs text-muted-foreground shadow-sm md:block xl:hidden"
+        className="focus-ring fixed bottom-4 left-4 hidden rounded-full border border-border bg-card p-2 text-xs text-muted-foreground shadow-sm md:block xl:hidden cursor-pointer"
         aria-label={sidebarCollapsed ? "Mở rộng sidebar" : "Thu gọn sidebar"}
       >
         {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}

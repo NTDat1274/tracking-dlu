@@ -2,7 +2,7 @@
 // Supabase Client and Database Operations for TrackingZ DLU Web Admin.
 import { createClient, type SupabaseClient, type RealtimeChannel } from "@supabase/supabase-js";
 import { getCloudConfig } from "./config";
-import type { VisitRecord, StudentSummary, VisitStatus, CameraOption } from "../data/types";
+import type { VisitRecord, StudentSummary, VisitStatus, CameraOption, AccountRecord } from "../data/types";
 
 let cachedClient: SupabaseClient | null = null;
 let currentConfigKey = "";
@@ -445,3 +445,181 @@ export async function deleteVisitRecord(id: string): Promise<{ success: boolean;
     return { success: false, error: err.message || 'Unknown error' };
   }
 }
+
+/**
+ * Fetch account record for a user
+ */
+export async function fetchUserAccount(userId: string): Promise<AccountRecord | null> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return {
+      id: userId,
+      email: "local@dlu.edu.vn",
+      role: "admin",
+      student_id: null,
+    };
+  }
+
+  try {
+    const { data, error } = await client
+      .from("accounts")
+      .select("*")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn("fetchUserAccount warning:", error.message);
+      return null;
+    }
+
+    return data as AccountRecord | null;
+  } catch (err) {
+    console.warn("fetchUserAccount error:", err);
+    return null;
+  }
+}
+
+/**
+ * Save student profile submitted by student self-service portal,
+ * and link student_id to user's account in Supabase.
+ */
+export async function saveStudentSelfProfile(data: {
+  student_id: string;
+  full_name: string;
+  class_name: string;
+  email: string;
+  portrait_url: string;
+  userId: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: true };
+  }
+
+  try {
+    // 1. Upsert student record
+    const { error: studentErr } = await client.from("students").upsert({
+      student_id: data.student_id.trim(),
+      full_name: data.full_name.trim(),
+      class_name: data.class_name.trim(),
+      email: data.email.trim(),
+      portrait_url: data.portrait_url.trim(),
+    });
+
+    if (studentErr) {
+      console.error("saveStudentSelfProfile student error:", studentErr);
+      return { success: false, error: studentErr.message };
+    }
+
+    // 2. Link student_id to accounts table
+    const { error: accountErr } = await client
+      .from("accounts")
+      .update({
+        student_id: data.student_id.trim(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", data.userId);
+
+    if (accountErr) {
+      console.error("saveStudentSelfProfile account link error:", accountErr);
+      return { success: false, error: accountErr.message };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Lỗi lưu hồ sơ sinh viên" };
+  }
+}
+
+/**
+ * Fetch personal profile for a specific student_id
+ */
+export async function fetchStudentPersonalProfile(studentId: string): Promise<(StudentSummary & { portraitUrl?: string; email?: string }) | null> {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const { data, error } = await client
+      .from("students")
+      .select("*")
+      .eq("student_id", studentId)
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return {
+      studentId: data.student_id,
+      name: data.full_name,
+      className: data.class_name || "",
+      email: data.email || "",
+      portraitUrl: data.portrait_url || "",
+      totalVisits: 0,
+      servedCount: 0,
+      avgWaitSecs: 0,
+      lastSeen: data.created_at || new Date().toISOString(),
+      lastCameraId: "CAM-01",
+      currentlyInArea: false,
+    };
+  } catch (err) {
+    console.warn("fetchStudentPersonalProfile error:", err);
+    return null;
+  }
+}
+
+/**
+ * Fetch personal visit records for a student
+ */
+export async function fetchStudentPersonalVisits(studentId: string): Promise<VisitRecord[]> {
+  const client = getSupabaseClient();
+  if (!client) return [];
+
+  try {
+    const { data, error } = await client
+      .from("student_records")
+      .select("*")
+      .eq("student_id", studentId)
+      .order("time_in", { ascending: false });
+
+    if (error || !data) return [];
+
+    const toLocalIso = (isoStr: string) => {
+      if (!isoStr) return isoStr;
+      return isoStr.replace(/(Z|[+-]\d{2}:?\d{2})$/, "");
+    };
+
+    return data.map((d: any) => {
+      let status: VisitStatus = "Waiting";
+      const s = (d.status || "").toUpperCase();
+      if (s === "SERVED" || s === "COMPLETED" || s === "ĐÃ TIẾP NHẬN") status = "Served";
+      else if (s === "UNATTENDED" || s === "ABANDONED" || s === "CHƯA TIẾP NHẬN") status = "Unattended";
+
+      const timeIn = toLocalIso(d.time_in || d.created_at) || new Date().toISOString();
+      const timeOut = d.time_out ? toLocalIso(d.time_out) : undefined;
+      const enteredMs = new Date(timeIn).getTime();
+      const exitedMs = timeOut ? new Date(timeOut).getTime() : Date.now();
+      const durSecs = Math.max(0, Math.round((exitedMs - enteredMs) / 1000));
+
+      return {
+        id: String(d.id),
+        studentId: d.student_id,
+        studentName: d.student_name || "Sinh viên",
+        className: d.class_name || "",
+        status,
+        cameraId: d.camera_id || "CAM-01",
+        enteredAt: timeIn,
+        exitedAt: timeOut,
+        durationSeconds: d.duration_seconds || durSecs,
+        waitSeconds: durSecs > 180 ? 180 : durSecs,
+        avatarUrl: d.best_crop || d.snapshot_url,
+        snapshotUrl: d.snapshot_url,
+        bestCrop: d.best_crop || d.snapshot_url,
+      } as VisitRecord;
+    });
+  } catch (err) {
+    console.warn("fetchStudentPersonalVisits error:", err);
+    return [];
+  }
+}
+

@@ -1,6 +1,9 @@
 // src/web/components/WebTopBar.tsx
+// Header bar with role status, page title, portal switch and export action.
 import type { WebPage } from "./WebApp";
 import { useAuth } from "../../context/AuthContext";
+import ThemeSwitcher from "./ThemeSwitcher";
+import { Menu, Download, GraduationCap, ShieldCheck } from "lucide-react";
 
 const TITLES: Record<WebPage, string> = {
   overview: "Tổng quan phòng ban",
@@ -14,13 +17,16 @@ interface WebTopBarProps {
   page: WebPage;
   onOpenDrawer: () => void;
   onExport: () => void;
+  onOpenStudentPortal?: () => void;
 }
 
-import ThemeSwitcher from "./ThemeSwitcher";
-import { Menu, Download } from "lucide-react";
-
-export default function WebTopBar({ page, onOpenDrawer, onExport }: WebTopBarProps) {
-  const { user } = useAuth();
+export default function WebTopBar({
+  page,
+  onOpenDrawer,
+  onExport,
+  onOpenStudentPortal,
+}: WebTopBarProps) {
+  const { user, role } = useAuth();
   // "Xuất báo cáo" should ONLY appear on visits and analytics pages
   const canExport = page === "visits" || page === "analytics";
 
@@ -31,7 +37,7 @@ export default function WebTopBar({ page, onOpenDrawer, onExport }: WebTopBarPro
           type="button"
           onClick={onOpenDrawer}
           aria-label="Mở menu điều hướng"
-          className="focus-ring rounded-lg border border-border p-1.5 text-muted-foreground hover:bg-muted md:hidden flex shrink-0 items-center justify-center"
+          className="focus-ring rounded-lg border border-border p-1.5 text-muted-foreground hover:bg-muted md:hidden flex shrink-0 items-center justify-center cursor-pointer"
         >
           <Menu size={20} />
         </button>
@@ -42,15 +48,37 @@ export default function WebTopBar({ page, onOpenDrawer, onExport }: WebTopBarPro
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-3">
+      <div className="flex shrink-0 items-center gap-2.5">
+        {/* Switch to Student Portal (Admin preview feature) */}
+        {role === "admin" && onOpenStudentPortal && (
+          <button
+            type="button"
+            onClick={onOpenStudentPortal}
+            className="focus-ring hidden md:flex items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+            title="Xem trước giao diện Cổng thông tin Sinh viên"
+          >
+            <GraduationCap size={15} />
+            <span>Cổng Sinh Viên</span>
+          </button>
+        )}
+
         {/* Theme Switcher Button */}
         <ThemeSwitcher />
 
-        {/* User Badge */}
+        {/* User Role Badge */}
         {user && (
-          <div className="hidden items-center gap-2 rounded-lg border border-border bg-background/50 px-3 py-1 sm:flex">
-            <span className="h-2 w-2 rounded-full bg-primary" />
-            <span className="text-xs font-medium text-muted-foreground">
+          <div className="hidden items-center gap-2 rounded-xl border border-border bg-background/60 px-3 py-1.5 sm:flex">
+            <span
+              className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                role === "admin"
+                  ? "bg-primary/15 text-primary"
+                  : "bg-secondary/15 text-secondary"
+              }`}
+            >
+              <ShieldCheck size={12} />
+              {role === "admin" ? "Quản trị viên" : "Sinh viên"}
+            </span>
+            <span className="text-xs font-medium text-muted-foreground max-w-[140px] truncate">
               {user.email}
             </span>
           </div>
@@ -61,10 +89,10 @@ export default function WebTopBar({ page, onOpenDrawer, onExport }: WebTopBarPro
           <button
             type="button"
             onClick={onExport}
-            className="focus-ring flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 shadow-sm transition-opacity"
+            className="focus-ring flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 shadow-sm transition-opacity cursor-pointer"
           >
             <Download size={16} />
-            Xuất báo cáo
+            <span>Xuất báo cáo</span>
           </button>
         )}
       </div>

@@ -1,4 +1,15 @@
 // src/data/types.ts
+export type UserRole = "admin" | "student";
+
+export interface AccountRecord {
+  id: string;
+  email: string;
+  role: UserRole;
+  student_id: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export type VisitStatus =
   | "Served"
   | "Waiting"
