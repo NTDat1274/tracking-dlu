@@ -54,11 +54,12 @@ export default function WebTopBar({
           <button
             type="button"
             onClick={onOpenStudentPortal}
-            className="focus-ring hidden md:flex items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+            className="focus-ring flex items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/10 p-2 sm:px-3 sm:py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors cursor-pointer shadow-xs"
             title="Xem trước giao diện Cổng thông tin Sinh viên"
+            aria-label="Xem trước Cổng sinh viên"
           >
-            <GraduationCap size={15} />
-            <span>Cổng Sinh Viên</span>
+            <GraduationCap size={16} />
+            <span className="hidden sm:inline">Cổng Sinh Viên</span>
           </button>
         )}
 

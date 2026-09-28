@@ -6,10 +6,11 @@ import ConfirmDialog from "../components/ConfirmDialog";
 import { NoResultState, EmptyState } from "../components/StateViews";
 import { StudentCardSkeleton } from "../components/LoadingSkeleton";
 import { StudentAvatar } from "../components/AvatarFallback";
-import StatusBadge from "../components/StatusBadge";
 import StudentModal, { type StudentFormData } from "../components/StudentModal";
+import StudentDetailDrawer from "../components/StudentDetailDrawer";
+import Pagination from "../components/Pagination";
 import { fetchStudents, deleteStudentCascade, fetchVisitRecords, fetchDistinctClasses } from "../../lib/supabase";
-import { fmtDateTime, fmtDuration, isWaitingTooLong, type StudentSummary, type VisitRecord } from "../../data/types";
+import { isWaitingTooLong, type StudentSummary, type VisitRecord } from "../../data/types";
 import { Trash2, AlertTriangle, Edit2, Plus } from "lucide-react";
 
 interface StudentsPageProps {
@@ -24,6 +25,10 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
   const [classes, setClasses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(12);
 
   // Modals state
   const [modalOpen, setModalOpen] = useState(false);
@@ -110,6 +115,24 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
     });
     return arr;
   }, [filtered, filters.sortBy, filters.sortDirection]);
+
+  // Compute pagination over sorted results
+  const totalPages = Math.ceil(sorted.length / pageSize) || 1;
+  const safePage = Math.min(page, totalPages);
+  const pageStudents = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return sorted.slice(start, start + pageSize);
+  }, [sorted, safePage, pageSize]);
+
+  function handleFiltersChange(newFilters: StudentFilterState) {
+    setPage(1);
+    onFiltersChange(newFilters);
+  }
+
+  function handleResetFilters() {
+    setPage(1);
+    onReset();
+  }
 
   const selected = enrichedStudents.find((s) => s.studentId === selectedId) ?? null;
   const history = visits.filter((r) => r.studentId === selectedId).slice(0, 8);
@@ -205,12 +228,12 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
         filters={filters}
         classes={classes}
         resultCount={sorted.length}
-        onChange={onFiltersChange}
-        onReset={onReset}
+        onChange={handleFiltersChange}
+        onReset={handleResetFilters}
       />
 
       {loading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-[repeat(auto-fill,minmax(300px,1fr))]">
           {Array.from({ length: 6 }).map((_, i) => (
             <StudentCardSkeleton key={i} />
           ))}
@@ -218,150 +241,105 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
       ) : students.length === 0 ? (
         <EmptyState message="Chưa có hồ sơ sinh viên nào. Vui lòng bấm '+ Thêm Sinh Viên Mới'." />
       ) : sorted.length === 0 ? (
-        <NoResultState message="Không tìm thấy sinh viên phù hợp với từ khóa." onReset={onReset} />
+        <NoResultState message="Không tìm thấy sinh viên phù hợp với từ khóa." onReset={handleResetFilters} />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {sorted.map((s) => (
-            <div
-              key={s.studentId}
-              onClick={() => setSelectedId(s.studentId)}
-              className={`rounded-2xl border bg-card p-4 transition-all duration-200 cursor-pointer ${
-                selectedId === s.studentId
-                  ? "border-primary ring-2 ring-primary/40 bg-primary/5"
-                  : "border-border hover:border-primary/50 hover:shadow-md"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <StudentAvatar src={s.portraitUrl} name={s.name} size="md" />
-                  <div>
-                    <p className="font-display text-sm font-bold text-foreground hover:text-primary transition-colors">
-                      {s.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      <span className="font-mono text-foreground/90 font-medium">{s.studentId}</span> · {s.className}
-                    </p>
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-[repeat(auto-fill,minmax(300px,1fr))]">
+            {pageStudents.map((s) => (
+              <div
+                key={s.studentId}
+                onClick={() => setSelectedId(s.studentId)}
+                className={`group flex flex-col justify-between h-full rounded-2xl border bg-card p-4 transition-all duration-200 cursor-pointer ${
+                  selectedId === s.studentId
+                    ? "border-primary ring-2 ring-primary/40 bg-primary/5"
+                    : "border-border hover:border-primary/50 hover:shadow-md"
+                }`}
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <StudentAvatar src={s.portraitUrl} name={s.name} size="md" className="shrink-0 mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <h3
+                          title={s.name}
+                          className="font-display text-sm font-bold text-foreground group-hover:text-primary transition-colors truncate"
+                        >
+                          {s.name}
+                        </h3>
+                        <p className="mt-0.5 text-xs text-muted-foreground truncate">
+                          <span className="font-mono text-foreground/90 font-medium">{s.studentId}</span>
+                          <span className="mx-1 text-muted-foreground/60">·</span>
+                          <span>{s.className}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Edit & Delete Action Buttons */}
+                    <div className="flex items-center gap-1 shrink-0 -mr-1 -mt-0.5">
+                      <button
+                        type="button"
+                        title="Chỉnh sửa sinh viên"
+                        onClick={(e) => handleOpenEdit(s, e)}
+                        className="focus-ring rounded-lg border border-border/80 p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground hover:border-border transition-colors cursor-pointer"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        title="Xóa sinh viên"
+                        onClick={(e) => handleOpenDelete(s, e)}
+                        className="focus-ring rounded-lg border border-offline/40 bg-offline/10 p-1.5 text-offline hover:bg-offline/20 hover:border-offline/60 transition-colors cursor-pointer"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
+
+                  {isWaitingTooLong(s.currentStatus, s.currentWaitSeconds) && (
+                    <div className="mt-3 flex items-center gap-1.5 rounded-lg border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-500">
+                      <AlertTriangle size={13} className="shrink-0" />
+                      <span>Chờ tiếp nhận quá 5 phút</span>
+                    </div>
+                  )}
                 </div>
 
-                {/* Edit & Delete Action Buttons */}
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    type="button"
-                    title="Chỉnh sửa sinh viên"
-                    onClick={(e) => handleOpenEdit(s, e)}
-                    className="focus-ring rounded-lg border border-border/80 p-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    title="Xóa sinh viên"
-                    onClick={(e) => handleOpenDelete(s, e)}
-                    className="focus-ring rounded-lg border border-offline/40 bg-offline/10 p-1.5 text-xs text-offline hover:bg-offline/20 transition-colors"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                <div className="mt-4 flex items-center justify-between border-t border-border/50 pt-3 text-xs text-muted-foreground">
+                  <span>Tổng lượt: <strong className="text-foreground font-semibold">{s.totalVisits}</strong></span>
+                  <span>Đã tiếp nhận: <strong className="text-primary font-semibold">{s.servedCount}</strong></span>
                 </div>
               </div>
+            ))}
+          </div>
 
-              <div className="mt-4 flex items-center justify-between border-t border-border/50 pt-3 text-xs text-muted-foreground">
-                <span>Tổng lượt: <strong className="text-foreground">{s.totalVisits}</strong></span>
-                <span>Đã tiếp nhận: <strong className="text-primary">{s.servedCount}</strong></span>
-              </div>
-
-              {isWaitingTooLong(s.currentStatus, s.currentWaitSeconds) && (
-                <p className="mt-2 text-xs font-semibold text-secondary flex items-center gap-1">
-                  <AlertTriangle size={14} className="inline text-amber-500 mr-1" /> Chờ tiếp nhận quá 5 phút
-                </p>
-              )}
+          {/* Pagination Bar for manageable browsing */}
+          {sorted.length > 0 && (
+            <div className="rounded-2xl border border-border bg-card shadow-xs overflow-hidden">
+              <Pagination
+                page={safePage}
+                totalPages={totalPages}
+                totalItems={sorted.length}
+                pageSize={pageSize}
+                pageSizes={[12, 24, 48]}
+                itemLabel="sinh viên"
+                onPageChange={setPage}
+                onPageSizeChange={(sz) => {
+                  setPageSize(sz);
+                  setPage(1);
+                }}
+              />
             </div>
-          ))}
+          )}
         </div>
       )}
 
-      {/* Selected Student Detail Panel */}
-      {selected && (
-          <div className="rounded-2xl border border-border bg-card p-6 shadow-sm animate-fade-in-up">
-          <div className="flex items-start justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-4 flex-wrap min-w-0">
-              <StudentAvatar src={selected.portraitUrl} name={selected.name} size="xl" />
-              <div className="min-w-0">
-                <h3 className="font-display text-lg font-bold text-foreground truncate">{selected.name}</h3>
-                <p className="text-xs text-muted-foreground truncate">
-                  MSSV: <span className="font-mono text-primary font-bold">{selected.studentId}</span> · Lớp / Khoa: {selected.className}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={(e) => handleOpenEdit(selected, e)}
-                    className="focus-ring inline-flex items-center gap-1 rounded-lg border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
-                  >
-                    <Edit2 size={16} /> Sửa thông tin
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => handleOpenDelete(selected, e)}
-                    className="focus-ring inline-flex items-center gap-1 rounded-lg border border-offline/40 bg-offline/10 px-3 py-1 text-xs font-semibold text-offline hover:bg-offline/20 transition-colors"
-                  >
-                    <Trash2 size={16} className="inline -mt-0.5" /> Xóa sinh viên
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setSelectedId(null)}
-              className="focus-ring rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              ✕ Đóng
-            </button>
-          </div>
-
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatBlock label="Tổng lượt đến" value={String(selected.totalVisits)} />
-            <StatBlock label="Lượt tiếp nhận" value={String(selected.servedCount)} />
-            <StatBlock label="T/g chờ trung bình" value={fmtDuration(selected.avgWaitSecs)} />
-            <StatBlock
-              label="Tỷ lệ tiếp nhận"
-              value={`${selected.totalVisits ? Math.round((selected.servedCount / selected.totalVisits) * 100) : 0}%`}
-            />
-          </div>
-
-          <h4 className="mt-6 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            Lịch sử ra/vào phòng của sinh viên
-          </h4>
-          <div className="mt-2 overflow-x-auto rounded-xl border border-border/80">
-            {history.length === 0 ? (
-              <p className="p-4 text-xs text-muted-foreground text-center">Chưa có lượt đến nào được ghi nhận.</p>
-            ) : (
-              <table className="w-full min-w-[500px] text-xs">
-                <thead>
-                  <tr className="border-b border-border text-left text-muted-foreground font-semibold">
-                    <th className="px-3 py-2.5 w-1/4">Thời gian vào</th>
-                    <th className="px-3 py-2.5 w-1/4">Thời gian ra</th>
-                    <th className="px-3 py-2.5 w-1/4">Thời gian ở</th>
-                    <th className="px-3 py-2.5 w-1/4">Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/40">
-                  {history.map((h) => (
-                    <tr key={h.id}>
-                      <td className="px-3 py-2 text-foreground font-medium">{fmtDateTime(h.enteredAt)}</td>
-                      <td className="px-3 py-2 text-foreground font-medium">{h.exitedAt ? fmtDateTime(h.exitedAt) : "Đang ở"}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{fmtDuration(h.durationSeconds)}</td>
-                      <td className="px-3 py-2">
-                        <StatusBadge status={h.status} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Slide-over Student Detail Drawer */}
+      <StudentDetailDrawer
+        student={selected}
+        history={history}
+        onClose={() => setSelectedId(null)}
+        onEdit={handleOpenEdit}
+        onDelete={handleOpenDelete}
+      />
 
       {/* Add / Edit Student Modal */}
       <StudentModal
@@ -381,15 +359,6 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
         onConfirm={handleConfirmDelete}
         onCancel={() => setDeleteCandidate(null)}
       />
-    </div>
-  );
-}
-
-function StatBlock({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border/60 bg-muted/40 p-3">
-      <p className="text-[11px] text-muted-foreground">{label}</p>
-      <p className="font-display text-base font-bold text-foreground mt-0.5">{value}</p>
     </div>
   );
 }

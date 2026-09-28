@@ -117,12 +117,23 @@ export function fmtDateTime(iso?: string): string {
 
 
 export function isWithinDateRange(
-  iso: string,
-  dateFrom: string,
-  dateTo: string,
+  iso?: string,
+  dateFrom?: string,
+  dateTo?: string,
 ): boolean {
+  if (!iso) return false;
   const time = new Date(iso).getTime();
-  const from = new Date(`${dateFrom}T00:00:00+07:00`).getTime();
-  const to = new Date(`${dateTo}T23:59:59.999+07:00`).getTime();
-  return time >= from && time <= to;
+  if (isNaN(time)) return false;
+
+  if (dateFrom && dateFrom.trim() !== "") {
+    const from = new Date(`${dateFrom}T00:00:00+07:00`).getTime();
+    if (!isNaN(from) && time < from) return false;
+  }
+
+  if (dateTo && dateTo.trim() !== "") {
+    const to = new Date(`${dateTo}T23:59:59.999+07:00`).getTime();
+    if (!isNaN(to) && time > to) return false;
+  }
+
+  return true;
 }

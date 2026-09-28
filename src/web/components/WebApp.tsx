@@ -23,14 +23,14 @@ export type WebPage = "overview" | "analytics" | "visits" | "students" | "settin
 export type WebModal = "export" | null;
 
 const getTodayStr = () => new Date().toISOString().split("T")[0];
-const getWeekAgoStr = () => {
+const getMonthAgoStr = () => {
   const d = new Date();
-  d.setDate(d.getDate() - 7);
+  d.setDate(d.getDate() - 30);
   return d.toISOString().split("T")[0];
 };
 
 const DEFAULT_ANALYTICS_FILTERS: AnalyticsFilterState = {
-  dateFrom: getWeekAgoStr(),
+  dateFrom: getMonthAgoStr(),
   dateTo: getTodayStr(),
   cameraId: "",
   className: "",
@@ -38,7 +38,7 @@ const DEFAULT_ANALYTICS_FILTERS: AnalyticsFilterState = {
 };
 
 const DEFAULT_VISIT_FILTERS: VisitFilterState = {
-  dateFrom: getWeekAgoStr(),
+  dateFrom: getMonthAgoStr(),
   dateTo: getTodayStr(),
   searchQuery: "",
   cameraId: "",
