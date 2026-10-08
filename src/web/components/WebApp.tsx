@@ -1,6 +1,6 @@
 // src/web/components/WebApp.tsx
 // Centralized state owner, namespaced per page to avoid cross-page filter bleed.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import WebSidebar from "./WebSidebar";
 import WebTopBar from "./WebTopBar";
 import { ChevronRight, ChevronLeft } from "lucide-react";
@@ -12,8 +12,9 @@ import StudentsPage from "../pages/StudentsPage";
 import SettingsPage from "../pages/SettingsPage";
 import LoginPage from "../pages/LoginPage";
 import StudentPortalPage from "../pages/StudentPortalPage";
+import LecturerPortalPage from "../pages/LecturerPortalPage";
 import VisitDetailDrawer from "./VisitDetailDrawer";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth, getDefaultLandingPathForRole } from "../../context/AuthContext";
 import type { AnalyticsFilterState } from "./filters/AnalyticsFilterBar";
 import type { VisitFilterState } from "./filters/VisitFilterBar";
 import type { StudentFilterState } from "./filters/StudentFilterBar";
@@ -53,6 +54,10 @@ const DEFAULT_STUDENT_FILTERS: StudentFilterState = {
   sortDirection: "desc",
 };
 
+// ===== Task 1.3: Protected Route - State-Based Routing =====
+// Định tuyến Admin dựa trên state `page` (overview | analytics | visits |
+// students | settings) làm NGUỒN CHÍNH duy nhất điều khiển giao diện, không
+// còn đồng bộ hai chiều với URL pathname nữa để tránh vòng lặp re-render.
 export default function WebApp() {
   const { user, loading, role } = useAuth();
   const [page, setPage] = useState<WebPage>("overview");
@@ -98,7 +103,14 @@ export default function WebApp() {
     );
   }
 
-  // Protected Route Guard: If not logged in, render LoginPage
+  // Protected Route Guard (State-Based):
+  //   - Chưa đăng nhập -> render LoginPage (để LoginPage tự xử lý URL).
+  //   - role = 'student' hoặc admin đang preview student portal -> StudentPortalPage.
+  //   - role = 'lecturer' -> LecturerPortalPage.
+  //   - role = 'admin' -> render Admin Dashboard với Sidebar/TopBar/main page
+  //     tương ứng với state `page`.
+  // Toàn bộ định tuyến nội bộ admin do state `page` điều khiển; URL pathname
+  // không còn là nguồn chính, do đó không xảy ra vòng lặp re-render.
   if (!user) {
     return <LoginPage />;
   }
@@ -110,6 +122,14 @@ export default function WebApp() {
         onBackToAdmin={() => setPreviewStudentPortal(false)}
       />
     );
+  }
+
+  // Lecturer Route Guard
+  // LecturerPortalPage cung cấp 2 tab: (1) Hồ sơ & ảnh AI,
+  // (2) Tra cứu lịch sử ra/vào khoa (read-only). Không có quyền
+  // thêm/sửa/xóa dữ liệu sinh viên hay cấu hình hệ thống như Admin.
+  if (role === "lecturer") {
+    return <LecturerPortalPage />;
   }
 
   // Only render Admin Dashboard if role is strictly 'admin'

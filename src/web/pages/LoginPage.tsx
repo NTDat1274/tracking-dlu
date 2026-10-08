@@ -1,8 +1,8 @@
 // src/web/pages/LoginPage.tsx
 // Trang Xác thực Đăng nhập & Đăng ký Sinh viên phong cách Swiss Modernism 2.0 (DLU Branding).
 // Tuân thủ: ui-ux-pro-max, frontend-design, vercel-react-best-practices, web-design-guidelines.
-import React, { useState } from "react";
-import { useAuth } from "../../context/AuthContext";
+import React, { useEffect, useState } from "react";
+import { useAuth, getDefaultLandingPathForRole } from "../../context/AuthContext";
 import {
   Shield,
   AlertTriangle,
@@ -17,7 +17,7 @@ import {
 type AuthMode = "signin" | "signup";
 
 export default function LoginPage() {
-  const { signIn, signUp, sessionExpiredMsg, clearSessionExpiredMsg } = useAuth();
+  const { signIn, signUp, sessionExpiredMsg, clearSessionExpiredMsg, user, role } = useAuth();
   const [mode, setMode] = useState<AuthMode>("signin");
 
   // Form states
@@ -30,6 +30,25 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
+  // Tự động điều hướng đúng trang sau khi Login thành công.
+  // Khi user & role đã sẵn sàng trong AuthContext, LoginPage thông báo
+  // cho WebApp thông qua callback onAuthenticated để chuyển state tới
+  // đúng portal: admin -> /overview, lecturer -> /lecturer-portal,
+  // student -> /student-portal. Nếu prop không được cung cấp (tương thích
+  // ngược), vẫn dùng window.location để điều hướng dạng soft fallback.
+  useEffect(() => {
+    if (user && role) {
+      const landingPath = getDefaultLandingPathForRole(role);
+      if (landingPath !== "/login") {
+        try {
+          window.history.replaceState({}, "", landingPath);
+        } catch (navErr) {
+          console.warn("Không thể cập nhật URL sau đăng nhập:", navErr);
+        }
+      }
+    }
+  }, [user, role]);
 
   const handleTabChange = (newMode: AuthMode) => {
     setMode(newMode);

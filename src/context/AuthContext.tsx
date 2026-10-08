@@ -38,6 +38,26 @@ export const AuthContext = createContext<AuthContextType | undefined>(
 // Thời gian tự động đăng xuất: 15 phút = 15 * 60 * 1000 ms
 const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
 
+/**
+ * Đường dẫn landing page mặc định cho từng role sau khi Login.
+ * - admin    -> '/overview'           (Dashboard toàn quyền - WebApp quản lý state overview)
+ * - lecturer -> '/lecturer-portal'    (Cổng giảng viên - sẽ tạo ở Task 1.2)
+ * - student  -> '/student-portal'     (Cổng sinh viên cá nhân)
+ * - fallback -> '/login'
+ */
+export function getDefaultLandingPathForRole(role: UserRole | null | undefined): string {
+  switch (role) {
+    case "admin":
+      return "/overview";
+    case "lecturer":
+      return "/lecturer-portal";
+    case "student":
+      return "/student-portal";
+    default:
+      return "/login";
+  }
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -60,11 +80,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setRole(acc.role);
     } else {
       // Xác định role khởi tạo dựa trên email hoặc mặc định
+      // 3 vai trò được hỗ trợ: 'admin' | 'lecturer' | 'student'
       const client = getSupabaseClient();
-      const isAdminEmail = userEmail
-        ? userEmail.toLowerCase().includes("admin")
-        : false;
-      const initialRole: UserRole = isAdminEmail ? "admin" : "student";
+      const normalizedEmail = (userEmail || "").toLowerCase();
+      const isAdminEmail = normalizedEmail.includes("admin");
+      const isLecturerEmail =
+        normalizedEmail.includes("lecturer") ||
+        normalizedEmail.includes("giangvien") ||
+        normalizedEmail.includes("giang_vien") ||
+        normalizedEmail.startsWith("gv") ||
+        normalizedEmail.includes(".gv@");
+      const initialRole: UserRole = isAdminEmail
+        ? "admin"
+        : isLecturerEmail
+          ? "lecturer"
+          : "student";
       const fallbackAcc: AccountRecord = {
         id: userId,
         email: userEmail || "",
@@ -288,6 +318,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         email: trimmedEmail,
         password,
         options: {
+          // Role mặc định cho tài khoản mới đăng ký qua form self-service.
+          // 3 giá trị được hỗ trợ: 'admin' | 'lecturer' | 'student'.
+          // Form đăng ký công khai chỉ cấp quyền 'student'; admin/lecturer
+          // được cấp phát qua quy trình nội bộ (cập nhật bảng accounts).
           data: {
             role: "student",
           },

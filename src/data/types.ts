@@ -1,5 +1,5 @@
 // src/data/types.ts
-export type UserRole = "admin" | "student";
+export type UserRole = "admin" | "lecturer" | "student";
 
 export interface AccountRecord {
   id: string;
@@ -78,6 +78,20 @@ export interface Insight {
   title: string;
   value: string;
   description: string;
+}
+
+/**
+ * Lecturer record stored in Supabase `lecturers` table.
+ * Vector 512-D embedding is computed by Desktop AI pipeline and updated separately.
+ */
+export interface Lecturer {
+  id: string;
+  lecturer_code: string;
+  full_name: string;
+  department?: string | null;
+  avatar_url?: string | null;
+  embedding?: number[] | null;
+  created_at?: string;
 }
 
 export function isWaitingTooLong(

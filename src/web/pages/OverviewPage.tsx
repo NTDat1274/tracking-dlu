@@ -4,10 +4,11 @@ import { useState, useEffect, useMemo } from "react";
 import KpiCard from "../components/KpiCard";
 import StatusBadge from "../components/StatusBadge";
 import BarChart from "../charts/BarChart";
+import CameraHeartbeatMonitor from "../components/CameraHeartbeatMonitor";
 
 import { KpiSkeleton, TableSkeleton } from "../components/LoadingSkeleton";
 import { StudentAvatar } from "../components/AvatarFallback";
-import { fetchVisitRecords, subscribeToStudentRecords, fetchDistinctCameras } from "../../lib/supabase";
+import { fetchVisitRecords, subscribeToStudentRecords, fetchDistinctCameras, fetchCamerasHeartbeat, subscribeToCamerasHeartbeat, type CameraHeartbeatRecord } from "../../lib/supabase";
 import { getCloudConfig } from "../../lib/config";
 import { fmtDuration, fmtTime, type VisitRecord, type CameraOption } from "../../data/types";
 import { Clock, ArrowRight } from "lucide-react";
@@ -22,6 +23,9 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
   const [cameras, setCameras] = useState<CameraOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  // Camera heartbeat state (Task 3.2) — driven by the `cameras` Supabase table.
+  const [cameraHeartbeats, setCameraHeartbeats] = useState<CameraHeartbeatRecord[]>([]);
+  const [camerasLoading, setCamerasLoading] = useState(true);
 
   // 1. Fetch initial records
   useEffect(() => {
@@ -65,17 +69,36 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
     return () => clearInterval(timer);
   }, []);
 
-  // 4. Poll live camera status every 5 seconds
+  // 3b. Camera Heartbeat realtime subscription (Task 3.2)
+  // Fetches the initial heartbeat list and then subscribes to the
+  // `cameras` table so the LED status / online count update instantly
+  // when Desktop App pings Supabase with a new `last_active_at`.
   useEffect(() => {
     let mounted = true;
-    const timer = setInterval(() => {
-      fetchDistinctCameras().then((cams) => {
-        if (mounted) setCameras(cams);
+
+    async function loadHeartbeats() {
+      setCamerasLoading(true);
+      const list = await fetchCamerasHeartbeat();
+      if (mounted) {
+        setCameraHeartbeats(list);
+        setCamerasLoading(false);
+      }
+    }
+
+    loadHeartbeats();
+
+    const sub = subscribeToCamerasHeartbeat(() => {
+      fetchCamerasHeartbeat().then((list) => {
+        if (mounted) {
+          setCameraHeartbeats(list);
+          setCamerasLoading(false);
+        }
       });
-    }, 5000);
+    });
+
     return () => {
       mounted = false;
-      clearInterval(timer);
+      sub.unsubscribe();
     };
   }, []);
 
@@ -261,6 +284,9 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
           </div>
         )}
       </div>
+
+      {/* Camera Heartbeat Monitor (Task 3.2) — Live LED Online/Offline indicators */}
+      <CameraHeartbeatMonitor cameras={cameraHeartbeats} loading={camerasLoading} />
 
       {/* Recent Activities & Charts Grid */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

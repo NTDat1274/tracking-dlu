@@ -2,7 +2,7 @@
 // Supabase Client and Database Operations for TrackingZ DLU Web Admin.
 import { createClient, type SupabaseClient, type RealtimeChannel } from "@supabase/supabase-js";
 import { getCloudConfig } from "./config";
-import type { VisitRecord, StudentSummary, VisitStatus, CameraOption, AccountRecord } from "../data/types";
+import type { VisitRecord, StudentSummary, VisitStatus, CameraOption, CameraStatus, AccountRecord, Lecturer } from "../data/types";
 
 let cachedClient: SupabaseClient | null = null;
 let currentConfigKey = "";
@@ -620,6 +620,393 @@ export async function fetchStudentPersonalVisits(studentId: string): Promise<Vis
   } catch (err) {
     console.warn("fetchStudentPersonalVisits error:", err);
     return [];
+  }
+}
+
+/**
+ * Fetch all lecturers from Supabase `lecturers` table.
+ * Falls back to an empty array when Supabase is unreachable.
+ */
+export async function fetchLecturers(): Promise<Lecturer[]> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await client
+      .from("lecturers")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error || !data) {
+      if (error) console.warn("Supabase fetchLecturers warning:", error.message);
+      return [];
+    }
+
+    return data.map((d: any) => ({
+      id: String(d.id),
+      lecturer_code: d.lecturer_code,
+      full_name: d.full_name,
+      department: d.department ?? null,
+      avatar_url: d.avatar_url ?? null,
+      embedding: d.embedding ?? null,
+      created_at: d.created_at,
+    })) as Lecturer[];
+  } catch (err) {
+    console.warn("fetchLecturers error:", err);
+    return [];
+  }
+}
+
+/**
+ * Fetch a single lecturer by their `lecturer_code` (unique business code).
+ */
+export async function fetchLecturerByCode(lecturerCode: string): Promise<Lecturer | null> {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const { data, error } = await client
+      .from("lecturers")
+      .select("*")
+      .eq("lecturer_code", lecturerCode.trim())
+      .maybeSingle();
+
+    if (error || !data) {
+      if (error) console.warn("fetchLecturerByCode warning:", error.message);
+      return null;
+    }
+
+    return {
+      id: String(data.id),
+      lecturer_code: data.lecturer_code,
+      full_name: data.full_name,
+      department: data.department ?? null,
+      avatar_url: data.avatar_url ?? null,
+      embedding: data.embedding ?? null,
+      created_at: data.created_at,
+    } as Lecturer;
+  } catch (err) {
+    console.warn("fetchLecturerByCode error:", err);
+    return null;
+  }
+}
+
+/**
+ * Insert or update a lecturer profile on Supabase `lecturers` table.
+ * Embedding is optional and only updated when explicitly provided (Desktop AI pipeline).
+ */
+export async function upsertLecturer(lecturer: {
+  lecturer_code: string;
+  full_name: string;
+  department?: string;
+  avatar_url?: string;
+  embedding?: number[];
+}): Promise<{ success: boolean; error?: string; data?: Lecturer }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, error: "Supabase chưa được cấu hình." };
+  }
+
+  try {
+    const payload: Record<string, any> = {
+      lecturer_code: lecturer.lecturer_code.trim(),
+      full_name: lecturer.full_name.trim(),
+      department: lecturer.department?.trim() || null,
+      avatar_url: lecturer.avatar_url?.trim() || null,
+    };
+
+    if (lecturer.embedding && Array.isArray(lecturer.embedding)) {
+      payload.embedding = lecturer.embedding;
+    }
+
+    const { data, error } = await client
+      .from("lecturers")
+      .upsert(payload, { onConflict: "lecturer_code" })
+      .select("*")
+      .maybeSingle();
+
+    if (error) {
+      console.error("Supabase upsertLecturer error:", error);
+      return { success: false, error: error.message };
+    }
+
+    return {
+      success: true,
+      data: data
+        ? ({
+            id: String(data.id),
+            lecturer_code: data.lecturer_code,
+            full_name: data.full_name,
+            department: data.department ?? null,
+            avatar_url: data.avatar_url ?? null,
+            embedding: data.embedding ?? null,
+            created_at: data.created_at,
+          } as Lecturer)
+        : undefined,
+    };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Lỗi không xác định" };
+  }
+}
+
+/**
+ * Delete a lecturer from Supabase `lecturers` table by their business code.
+ * Cleans up the Cloudinary avatar (if present) via the Edge Function.
+ */
+export async function deleteLecturerByCode(lecturerCode: string): Promise<{ success: boolean; error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, error: "Supabase chưa được cấu hình." };
+  }
+
+  try {
+    // 1. Fetch avatar_url before deleting for Cloudinary cleanup
+    const { data: existing } = await client
+      .from("lecturers")
+      .select("avatar_url")
+      .eq("lecturer_code", lecturerCode.trim())
+      .maybeSingle();
+
+    let publicId: string | null = null;
+    if (existing?.avatar_url) {
+      const parts = String(existing.avatar_url).split("/upload/");
+      if (parts.length > 1) {
+        let path = parts[1];
+        if (path.match(/^v\d+\//)) path = path.replace(/^v\d+\//, "");
+        const dotIndex = path.lastIndexOf(".");
+        if (dotIndex !== -1) path = path.substring(0, dotIndex);
+        publicId = path;
+      }
+    }
+
+    // 2. Delete row from Supabase
+    const { error } = await client
+      .from("lecturers")
+      .delete()
+      .eq("lecturer_code", lecturerCode.trim());
+
+    if (error) {
+      console.error("Supabase deleteLecturerByCode error:", error);
+      return { success: false, error: error.message };
+    }
+
+    // 3. Best-effort cleanup of Cloudinary avatar
+    if (publicId) {
+      try {
+        await client.functions.invoke("delete-cloudinary-image", {
+          body: { public_id: publicId },
+        });
+      } catch (edgeErr) {
+        console.warn("Could not delete Cloudinary lecturer avatar:", edgeErr);
+      }
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Lỗi không xác định" };
+  }
+}
+
+/**
+ * Update the 512-D face embedding vector for a given lecturer.
+ * Used by the Desktop AI pipeline after a successful face enrollment.
+ */
+export async function updateLecturerEmbedding(
+  lecturerCode: string,
+  embedding: number[],
+): Promise<{ success: boolean; error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: false, error: "Supabase chưa được cấu hình." };
+  }
+
+  if (!Array.isArray(embedding) || embedding.length === 0) {
+    return { success: false, error: "Embedding vector không hợp lệ." };
+  }
+
+  try {
+    const { error } = await client
+      .from("lecturers")
+      .update({ embedding })
+      .eq("lecturer_code", lecturerCode.trim());
+
+    if (error) {
+      console.error("Supabase updateLecturerEmbedding error:", error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Lỗi không xác định" };
+  }
+}
+
+/**
+ * Realtime subscription for the `lecturers` table.
+ * Fires onRecordChange for INSERT/UPDATE/DELETE events.
+ */
+export function subscribeToLecturers(
+  onLecturerChange: (payload: any) => void,
+): { unsubscribe: () => void } {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { unsubscribe: () => {} };
+  }
+
+  try {
+    const channel: RealtimeChannel = client
+      .channel("lecturers_realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "lecturers" },
+        (payload) => {
+          onLecturerChange(payload);
+        },
+      )
+      .subscribe();
+
+    return {
+      unsubscribe: () => {
+        client.removeChannel(channel);
+      },
+    };
+  } catch (err) {
+    console.error("Failed to subscribe to realtime lecturers:", err);
+    return { unsubscribe: () => {} };
+  }
+}
+
+/**
+ * Rich camera heartbeat record returned by `fetchCamerasHeartbeat`.
+ * Includes the raw `last_active_at` timestamp so the UI can display
+ * "last seen" timing and derive an offline state when too much time
+ * has elapsed since the last ping (1-2 minutes by default).
+ */
+export interface CameraHeartbeatRecord {
+  id: string;
+  label: string;
+  fps: number;
+  rawStatus: string | null;
+  status: CameraStatus;
+  lastActiveAt: string | null;
+  lastActiveMs: number | null;
+  ageSeconds: number;
+  isOnline: boolean;
+}
+
+/**
+ * Threshold (milliseconds) after which a camera is considered offline
+ * if no heartbeat has been received. Configured to 90 seconds (~1.5 min)
+ * to be lenient with brief network blips while still detecting failures
+ * within 1-2 minutes as required by the task.
+ */
+export const CAMERA_HEARTBEAT_TIMEOUT_MS = 90 * 1000;
+
+/**
+ * Fetch the full heartbeat row for each registered camera in the
+ * `cameras` table. Unlike `fetchDistinctCameras`, this helper also
+ * returns the raw `last_active_at` value and computes the heartbeat
+ * age so that the UI can render live indicators and last-seen labels.
+ */
+export async function fetchCamerasHeartbeat(): Promise<CameraHeartbeatRecord[]> {
+  const client = getSupabaseClient();
+
+  if (!client) {
+    // Offline / no-config fallback: report a single synthetic offline camera.
+    return [
+      {
+        id: "CAM-01",
+        label: "Camera 01",
+        fps: 30,
+        rawStatus: "Offline",
+        status: "Offline",
+        lastActiveAt: null,
+        lastActiveMs: null,
+        ageSeconds: Number.POSITIVE_INFINITY,
+        isOnline: false,
+      },
+    ];
+  }
+
+  try {
+    const { data, error } = await client.from("cameras").select("*");
+    if (error || !data || data.length === 0) return [];
+
+    const now = Date.now();
+    return data.map((d: any) => {
+      const rawStatus = (d.status as string | null) ?? null;
+      let lastActiveMs: number | null = null;
+      let lastActiveAt: string | null = d.last_active_at ?? null;
+
+      if (lastActiveAt) {
+        const ts = new Date(lastActiveAt).getTime();
+        if (!isNaN(ts)) lastActiveMs = ts;
+      }
+
+      const ageSeconds = lastActiveMs
+        ? Math.max(0, Math.floor((now - lastActiveMs) / 1000))
+        : Number.POSITIVE_INFINITY;
+
+      const expiredByHeartbeat =
+        lastActiveMs === null || now - lastActiveMs > CAMERA_HEARTBEAT_TIMEOUT_MS;
+      const statusFlagOffline = rawStatus === "Offline";
+
+      const isOnline = !(expiredByHeartbeat || statusFlagOffline);
+
+      return {
+        id: d.id,
+        label: d.label || `Camera ${d.id}`,
+        fps: d.fps || 30,
+        rawStatus,
+        status: isOnline ? "Connected" : "Offline",
+        lastActiveAt,
+        lastActiveMs,
+        ageSeconds,
+        isOnline,
+      };
+    });
+  } catch (err) {
+    console.warn("fetchCamerasHeartbeat error:", err);
+    return [];
+  }
+}
+
+/**
+ * Realtime subscription for the `cameras` heartbeat table.
+ * Fires `onCameraChange` for every INSERT/UPDATE/DELETE event so the
+ * dashboard can re-fetch the heartbeat list and update the UI without
+ * relying on heavy polling intervals.
+ */
+export function subscribeToCamerasHeartbeat(
+  onCameraChange: (payload: any) => void,
+): { unsubscribe: () => void } {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { unsubscribe: () => {} };
+  }
+
+  try {
+    const channel: RealtimeChannel = client
+      .channel("cameras_heartbeat_realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "cameras" },
+        (payload) => {
+          onCameraChange(payload);
+        },
+      )
+      .subscribe();
+
+    return {
+      unsubscribe: () => {
+        client.removeChannel(channel);
+      },
+    };
+  } catch (err) {
+    console.error("Failed to subscribe to realtime cameras heartbeat:", err);
+    return { unsubscribe: () => {} };
   }
 }
 
