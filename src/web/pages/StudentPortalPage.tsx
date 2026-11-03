@@ -7,10 +7,11 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { uploadImageToCloudinary } from "../../lib/cloudinary";
 import {
-  saveStudentSelfProfile,
+  linkAccountStudentId,
   fetchStudentPersonalProfile,
   fetchStudentPersonalVisits,
   submitPendingStudent,
+  fetchStudentPendingSubmission,
 } from "../../lib/supabase";
 import { StudentAvatar } from "../components/AvatarFallback";
 import StatusBadge from "../components/StatusBadge";
@@ -63,6 +64,7 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
   const [submissionState, setSubmissionState] = useState<"idle" | "pending" | "approved">("idle");
+  const [isCapturingNew, setIsCapturingNew] = useState(false);
 
   // History & Metrics state
   const [visits, setVisits] = useState<VisitRecord[]>([]);
@@ -81,10 +83,11 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
     setLoadingHistory(true);
 
     try {
-      // Async-parallel: Fetch profile and visits simultaneously
-      const [profileData, visitsData] = await Promise.all([
+      // Async-parallel: Fetch profile, visits, and pending submission simultaneously
+      const [profileData, visitsData, pendingData] = await Promise.all([
         fetchStudentPersonalProfile(idToFetch),
         fetchStudentPersonalVisits(idToFetch),
+        fetchStudentPendingSubmission({ userId: user?.id, studentId: idToFetch }),
       ]);
 
       if (profileData) {
@@ -96,6 +99,16 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
           setPortraitUrl(profileData.portraitUrl);
           setPreviewUrl(profileData.portraitUrl);
         }
+      } else if (pendingData) {
+        setSubmissionState("pending");
+        setStudentId(pendingData.student_id);
+        setFullName(pendingData.full_name);
+        if (pendingData.class_name) setClassName(pendingData.class_name);
+        if (pendingData.email) setEmail(pendingData.email);
+        if (pendingData.portrait_url) {
+          setPortraitUrl(pendingData.portrait_url);
+          setPreviewUrl(pendingData.portrait_url);
+        }
       }
 
       setVisits(visitsData);
@@ -105,7 +118,7 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
       setLoadingProfile(false);
       setLoadingHistory(false);
     }
-  }, [account?.student_id]);
+  }, [account?.student_id, user?.id]);
 
   useEffect(() => {
     let mounted = true;
@@ -116,9 +129,10 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
 
     async function init() {
       try {
-        const [profileData, visitsData] = await Promise.all([
+        const [profileData, visitsData, pendingData] = await Promise.all([
           fetchStudentPersonalProfile(idToFetch),
           fetchStudentPersonalVisits(idToFetch),
+          fetchStudentPendingSubmission({ userId: user?.id, studentId: idToFetch }),
         ]);
         if (!mounted) return;
         if (profileData) {
@@ -129,6 +143,16 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
           if (profileData.portraitUrl) {
             setPortraitUrl(profileData.portraitUrl);
             setPreviewUrl(profileData.portraitUrl);
+          }
+        } else if (pendingData) {
+          setSubmissionState("pending");
+          setStudentId(pendingData.student_id);
+          setFullName(pendingData.full_name);
+          if (pendingData.class_name) setClassName(pendingData.class_name);
+          if (pendingData.email) setEmail(pendingData.email);
+          if (pendingData.portrait_url) {
+            setPortraitUrl(pendingData.portrait_url);
+            setPreviewUrl(pendingData.portrait_url);
           }
         }
         setVisits(visitsData);
@@ -146,7 +170,7 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
     return () => {
       mounted = false;
     };
-  }, [account?.student_id]);
+  }, [account?.student_id, user?.id]);
 
   // Handle Webcam capture from <WebcamCapture /> component
   // Task 4.1: file upload tự do đã bị KHÓA. Ảnh chỉ tới từ Webcam.
@@ -154,6 +178,7 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
     setWebcamBlob(blob);
     setWebcamPreviewUrl(dataUrl);
     setPreviewUrl(dataUrl);
+    setIsCapturingNew(false);
     setFormError("");
   }, []);
 
@@ -186,7 +211,7 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
     }
     if (!webcamBlob && !portraitUrl) {
       setFormError(
-        "Vui lòng bật Webcam và chụp ảnh khuôn mặt trực diện trước khi gửi hồ sơ.",
+        "Vui lòng bật Camera và chụp ảnh khuôn mặt trực diện trước khi gửi hồ sơ.",
       );
       return;
     }
@@ -239,33 +264,28 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
       return;
     }
 
-    // 3. Liên kết student_id với tài khoản (giúp sinh viên xem được lịch
-    //    sử ra/vào của chính mình sau khi Admin duyệt).
-    const saveRes = await saveStudentSelfProfile({
-      student_id: cleanStuId,
-      full_name: cleanName,
-      class_name: cleanClass,
-      email: cleanEmail,
-      portrait_url: finalImageUrl,
-      userId: user.id,
-    });
+    // 3. Liên kết student_id với tài khoản sinh viên trong bảng accounts
+    //    (hồ sơ chính sẽ được đưa vào bảng students khi Admin phê duyệt).
+    const linkRes = await linkAccountStudentId(user.id, cleanStuId);
 
     setIsSubmitting(false);
 
-    if (saveRes.success) {
+    if (linkRes.success) {
       setFormSuccess(
-        "Hồ sơ & ảnh chụp Webcam đã gửi đến bảng chờ duyệt. Quản trị viên sẽ phê duyệt trong ít phút.",
+        "Hồ sơ & ảnh chụp Camera đã gửi đến bảng chờ duyệt. Quản trị viên sẽ phê duyệt trong ít phút.",
       );
       setSubmissionState("pending");
       await refreshAccount();
-      // Reload visits in case they were mapped to this student ID
+      // Tải lại dữ liệu và kiểm tra hàng đợi chờ duyệt
       loadData(cleanStuId);
     } else {
-      setFormError(saveRes.error || "Lỗi lưu hồ sơ vào Supabase.");
+      setFormError(linkRes.error || "Lỗi liên kết tài khoản sinh viên.");
     }
   };
 
-  const isProfileComplete = Boolean(studentId && fullName && (portraitUrl || previewUrl));
+  const hasPhoto = Boolean(webcamPreviewUrl || previewUrl || portraitUrl);
+  const activePhotoUrl = webcamPreviewUrl || previewUrl || portraitUrl;
+  const isProfileComplete = Boolean(studentId && fullName && hasPhoto);
   const totalVisits = visits.length;
   const servedVisits = visits.filter((v) => v.status === "Served").length;
   const waitingVisits = visits.filter((v) => v.status === "Waiting").length;
@@ -386,14 +406,14 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="font-display text-sm font-bold text-foreground">
-                    Hồ sơ Webcam đang chờ Admin phê duyệt
+                    Hồ sơ Camera đang chờ Admin phê duyệt
                   </h2>
                   <span className="rounded-full bg-secondary/20 px-2 py-0.5 text-[10px] font-bold text-secondary">
                     Đang xử lý
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Ảnh chụp Webcam đã được gửi vào bảng tạm <strong className="font-mono">pending_students</strong>. Quản trị viên sẽ xem xét và duyệt trong ít phút.
+                  Ảnh chụp Camera đã được gửi vào bảng tạm <strong className="font-mono">pending_students</strong>. Quản trị viên sẽ xem xét và duyệt trong ít phút.
                 </p>
               </div>
             </div>
@@ -451,51 +471,86 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
                 </p>
               </div>
 
-              {/* Photo Frame with Webcam Guide (Task 4.1) */}
-              <div className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/80 bg-background/50 p-3 text-center group hover:border-primary/60 transition-colors">
-                {previewUrl && !webcamPreviewUrl ? (
-                  <div className="relative">
+              {/* Chế độ 1: Thẻ ảnh chân dung sinh viên khi đã có ảnh */}
+              {hasPhoto && !isCapturingNew ? (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-border/80 bg-background/50 p-5 text-center space-y-4 shadow-2xs">
+                  <div className="relative group">
                     <img
-                      src={previewUrl}
-                      alt="Ảnh chân dung hiện tại"
-                      className="h-48 w-36 rounded-xl object-cover shadow-md border-2 border-primary/40"
+                      src={activePhotoUrl}
+                      alt="Ảnh chân dung sinh viên"
+                      className="h-56 w-42 rounded-2xl object-cover shadow-md border-2 border-primary/40 transition-transform duration-300 group-hover:scale-[1.02]"
                     />
-                    <div className="absolute inset-0 rounded-xl ring-2 ring-primary/30 pointer-events-none" />
+                    <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/15 pointer-events-none" />
                   </div>
-                ) : null}
 
-                <div className="w-full">
+                  {/* Nhãn trạng thái hồ sơ ảnh */}
+                  <div className="flex flex-col items-center gap-1">
+                    {webcamPreviewUrl ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary animate-fade-in-up">
+                        <Sparkles size={13} />
+                        Ảnh mới đã chụp — bấm Lưu để gửi duyệt
+                      </span>
+                    ) : submissionState === "pending" ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                        <Hourglass size={13} />
+                        Ảnh chân dung đang chờ duyệt
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle2 size={13} />
+                        Ảnh chân dung đã kích hoạt
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Nút hành động: Thay đổi / Chụp lại */}
+                  <button
+                    type="button"
+                    onClick={() => setIsCapturingNew(true)}
+                    className="focus-ring inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted transition-all cursor-pointer shadow-xs"
+                  >
+                    <Camera size={15} className="text-primary" />
+                    {webcamPreviewUrl ? "Chụp lại bằng Camera" : "Thay đổi ảnh bằng Camera"}
+                  </button>
+                </div>
+              ) : (
+                /* Chế độ 2: Bật Camera chụp ảnh chân dung */
+                <div className="rounded-2xl border border-border/80 bg-background/50 p-4 space-y-3">
                   <WebcamCapture
                     onCapture={handleWebcamCapture}
                     onReset={handleWebcamReset}
+                    onCancel={hasPhoto ? () => setIsCapturingNew(false) : undefined}
                   />
+
+                  {hasPhoto && (
+                    <button
+                      type="button"
+                      onClick={() => setIsCapturingNew(false)}
+                      className="focus-ring inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                    >
+                      Đóng và giữ ảnh cũ
+                    </button>
+                  )}
                 </div>
+              )}
 
-                {webcamPreviewUrl && (
-                  <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-online/40 bg-online/10 px-2.5 py-0.5 text-[11px] font-semibold text-online">
-                    <Camera size={12} />
-                    Đã chụp ảnh Webcam — sẵn sàng gửi duyệt.
-                  </div>
-                )}
-              </div>
-
-              {/* AI Photo Guidelines Checklist (ui-ux-pro-max & swiss modernism) */}
+              {/* Tiêu chuẩn ảnh nhận diện AI duy nhất */}
               <div className="rounded-xl border border-border/70 bg-muted/30 p-4 space-y-2.5 text-xs">
                 <p className="font-semibold text-foreground flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <Info size={14} className="text-primary" /> Tiêu chuẩn ảnh AI
+                  <Info size={14} className="text-primary" /> Tiêu chuẩn ảnh nhận diện AI
                 </p>
                 <ul className="space-y-1.5 text-muted-foreground text-[11px]">
                   <li className="flex items-start gap-2">
-                    <CheckCircle2 size={13} className="shrink-0 text-online mt-0.5" />
-                    <span>Chụp thẳng trực diện, rõ hai mắt và nét mặt.</span>
+                    <CheckCircle2 size={13} className="shrink-0 text-emerald-500 mt-0.5" />
+                    <span>Chụp thẳng trực diện, nhìn thẳng vào camera, rõ hai mắt.</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle2 size={13} className="shrink-0 text-online mt-0.5" />
-                    <span>Ánh sáng đủ rõ, không bị ngược sáng hoặc bóng đổ.</span>
+                    <CheckCircle2 size={13} className="shrink-0 text-emerald-500 mt-0.5" />
+                    <span>Ánh sáng đủ rõ, không bị ngược sáng hoặc bóng đổ tối mặt.</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <CheckCircle2 size={13} className="shrink-0 text-online mt-0.5" />
-                    <span>Không đeo khẩu trang, kính râm hoặc che khuất mặt.</span>
+                    <CheckCircle2 size={13} className="shrink-0 text-emerald-500 mt-0.5" />
+                    <span>Không đeo khẩu trang, kính râm hoặc che khuất khuôn mặt.</span>
                   </li>
                 </ul>
               </div>

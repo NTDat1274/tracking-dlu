@@ -808,6 +808,46 @@ export async function saveStudentSelfProfile(data: {
 /**
  * Fetch personal profile for a specific student_id
  */
+
+/**
+ * Link student_id to accounts table without directly modifying the students table.
+ * Used during Student Portal self-submission pending admin review.
+ */
+export async function linkAccountStudentId(
+  userId: string,
+  studentId: string
+): Promise<{ success: boolean; error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) return { success: true };
+
+  const cleanUserId = sanitizeId(userId);
+  const cleanStudentId = sanitizeId(studentId);
+  if (!cleanUserId || !cleanStudentId) {
+    return { success: false, error: "Thiếu thông tin người dùng hoặc MSSV." };
+  }
+
+  try {
+    const { error } = await client
+      .from("accounts")
+      .update({
+        student_id: cleanStudentId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", cleanUserId);
+
+    if (error) {
+      console.error("linkAccountStudentId error:", error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || "Lỗi liên kết tài khoản sinh viên.",
+    };
+  }
+}
+
 export async function fetchStudentPersonalProfile(studentId: string): Promise<(StudentSummary & { portraitUrl?: string; email?: string }) | null> {
   const cleanId = sanitizeId(studentId);
   if (!cleanId) return null;
@@ -1356,6 +1396,7 @@ export async function submitPendingStudent(input: {
     if (sanitizeText(input.email ?? "", 120)) payload.email = sanitizeText(input.email, 120);
     if (input.submitted_by) payload.submitted_by = sanitizeId(input.submitted_by);
 
+    let insertedId: string | undefined;
     const { data, error } = await client
       .from("pending_students")
       .insert(payload)
@@ -1363,10 +1404,18 @@ export async function submitPendingStudent(input: {
       .maybeSingle();
 
     if (error) {
-      console.error("submitPendingStudent error:", error);
-      return { success: false, error: error.message };
+      // Defensive fallback: if SELECT returning was constrained, retry with minimal return
+      const { error: retryErr } = await client
+        .from("pending_students")
+        .insert(payload);
+      if (retryErr) {
+        console.error("submitPendingStudent error:", retryErr);
+        return { success: false, error: retryErr.message };
+      }
+    } else {
+      insertedId = data?.id;
     }
-    return { success: true, id: data?.id };
+    return { success: true, id: insertedId };
   } catch (err: any) {
     return { success: false, error: err?.message || "Lỗi gửi hồ sơ chờ duyệt" };
   }
@@ -1378,6 +1427,58 @@ export async function submitPendingStudent(input: {
  * to act on; pass `status = 'all'` to retrieve every record (useful for
  * analytics/review history).
  */
+
+/**
+ * Fetch the latest pending submission for a student by userId or studentId.
+ */
+export async function fetchStudentPendingSubmission(params: {
+  userId?: string;
+  studentId?: string;
+}): Promise<PendingStudentRecord | null> {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  try {
+    let query = client
+      .from("pending_students")
+      .select(
+        "id, student_id, full_name, class_name, email, portrait_url, status, submitted_by, reviewed_by, review_note, created_at, updated_at"
+      )
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (params.userId) {
+      query = query.eq("submitted_by", sanitizeId(params.userId));
+    } else if (params.studentId) {
+      query = query.eq("student_id", sanitizeId(params.studentId));
+    } else {
+      return null;
+    }
+
+    const { data, error } = await query.maybeSingle();
+    if (error || !data) return null;
+
+    return {
+      id: data.id,
+      student_id: data.student_id,
+      full_name: data.full_name,
+      class_name: data.class_name || "",
+      email: data.email || "",
+      portrait_url: data.portrait_url,
+      status: data.status,
+      submitted_by: data.submitted_by,
+      reviewed_by: data.reviewed_by,
+      review_note: data.review_note,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+    };
+  } catch (err) {
+    console.warn("fetchStudentPendingSubmission error:", err);
+    return null;
+  }
+}
+
 export async function fetchPendingStudents(
   status: PendingStudentStatus | "all" = "pending",
 ): Promise<PendingStudentRecord[]> {
@@ -1507,6 +1608,9 @@ export async function approvePendingStudent(input: {
       return { success: false, error: reviewUpdate.error.message };
     }
 
+    inMemoryCache.invalidate("students");
+    inMemoryCache.invalidate("classes");
+
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err?.message || "Lỗi duyệt hồ sơ" };
@@ -1622,6 +1726,11 @@ export async function batchApproveValidPendingStudents(input: {
         continue;
       }
       approved += 1;
+    }
+
+    if (approved > 0) {
+      inMemoryCache.invalidate("students");
+      inMemoryCache.invalidate("classes");
     }
 
     return { approved, rejected: 0, skipped };

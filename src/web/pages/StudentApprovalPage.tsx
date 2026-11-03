@@ -153,7 +153,7 @@ export default function StudentApprovalPage() {
     if (processing[row.id]) return;
     const reason = window.prompt(
       `Lý do từ chối hồ sơ ${row.student_id} - ${row.full_name}? (tuỳ chọn)`,
-      "Ảnh Webcam chưa đạt yêu cầu chất lượng.",
+      "Ảnh Camera chưa đạt yêu cầu chất lượng.",
     );
     if (reason === null) return; // user cancelled
     setProcessing((p) => ({ ...p, [row.id]: true }));
@@ -207,7 +207,7 @@ export default function StudentApprovalPage() {
             Phê duyệt Hồ sơ Sinh viên
           </h2>
           <p className="text-xs text-muted-foreground">
-            Danh sách hồ sơ sinh viên gửi qua Cổng sinh viên — chờ Admin xác minh ảnh chụp Webcam trước khi
+            Danh sách hồ sơ sinh viên gửi qua Cổng sinh viên — chờ Admin xác minh ảnh chụp Camera trước khi
             đưa vào hệ thống AI nhận diện và đồng bộ về Desktop App.
           </p>
         </div>

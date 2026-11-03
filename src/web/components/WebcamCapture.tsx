@@ -1,19 +1,7 @@
 // src/web/components/WebcamCapture.tsx
-// Task 4.1 — Live Webcam capture component.
-//
-// Replaces the legacy "upload file ảnh tự do" flow used in the Student
-// Portal and Admin Student Modal with a controlled `getUserMedia` stream
-// + on-screen oval face guide + lightweight brightness / face-region check.
-//
-// The component is intentionally self-contained so it can be reused by
-// both `StudentPortalPage` and `StudentModal` without introducing new
-// shared state. All UI tokens follow the DLU brand palette already
-// declared in `index.css`.
-//
-// Strict rules respected:
-//   - Không BAO GIỜ dùng `<input type="file">` để tải ảnh tự do.
-//   - Capture trả về `Blob` (JPEG) để upload qua `uploadImageToCloudinary`.
-//   - Cleanup: tắt mọi MediaStream khi component unmount.
+// Chụp ảnh chân dung trực tiếp qua Camera thiết bị (PC & Mobile).
+// Tối ưu chuẩn ảnh thẻ sinh viên 3:4, khuôn mặt tự nhiên, không viền đen nhân tạo.
+// Tuân thủ toàn diện: ui-ux-pro-max, frontend-design, vercel-react-best-practices.
 
 import {
   useCallback,
@@ -29,60 +17,45 @@ import {
   Loader2,
   RefreshCw,
   Lock,
-  Lightbulb,
+  SwitchCamera,
+  ShieldAlert,
+  Timer,
+  X,
 } from "lucide-react";
 
+import {
+  classifyCameraError,
+  requestMediaStreamWithFallback,
+  stopMediaStreamTracks,
+  analyzeLumaValues,
+  type CameraStatus,
+  type BrightnessCheck,
+} from "./WebcamCaptureLogic";
+
 export interface WebcamCaptureProps {
-  /** Called with the captured snapshot as a JPEG `Blob` + object URL. */
+  /** Callback trả về ảnh đã chụp dưới dạng JPEG Blob + data URL. */
   onCapture: (payload: { blob: Blob; dataUrl: string }) => void;
-  /** Called when the user discards the current snapshot and re-opens the camera. */
+  /** Callback khi người dùng bấm chụp lại. */
   onReset?: () => void;
-  /** Optional fixed aspect ratio for the preview region (default = 4:3). */
+  /** Callback khi người dùng muốn đóng camera (nếu đã có ảnh trước đó). */
+  onCancel?: () => void;
+  /** Tỉ lệ khung hình (mặc định = 3/4 cho ảnh thẻ chân dung). */
   aspectRatio?: number;
-  /** Render compact variant for use inside narrow modals. */
+  /** Chế độ thu gọn khi nhúng vào modal hẹp. */
   compact?: boolean;
-  /**
-   * If true, locks all file-upload affordances. The component already
-   * never exposes any `<input type="file">`, but this prop is exposed so
-   * the parent can render an additional "Tính năng tải file đã bị khóa"
-   * hint when needed.
-   */
+  /** Hiển thị nhãn tính năng upload file đã bị khóa. */
   fileUploadDisabled?: boolean;
 }
 
-type CameraStatus =
-  | "idle"
-  | "requesting"
-  | "ready"
-  | "captured"
-  | "denied"
-  | "unavailable"
-  | "error";
-
-interface BrightnessCheck {
-  /** Mean luma (0-255) of the central oval region. */
-  avgLuma: number;
-  /** Computed `stddev` of luminance (texture proxy). */
-  stddev: number;
-  /** Faces with average luma 30..220 AND stddev>=12 are considered "ok". */
-  isAcceptable: boolean;
-}
-
 /**
- * Sample the average brightness of a captured image to make sure the
- * student is not shooting against the sun or in a pitch-dark room.
- *
- * The check is deliberately lightweight (canvas downscale + luma mean
- * + stddev) so it runs even on low-end laptops. We do not run any
- * heavyweight ML model — only a coarse "good / dim / blown-out" gate
- * before unlocking the shutter.
+ * Phân tích độ sáng và độ nét của ảnh chụp (Downscale canvas + Luma mean + Stddev).
  */
 function analyzeBrightness(dataUrl: string): Promise<BrightnessCheck> {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       try {
-        const target = 96; // downscale for speed
+        const target = 96;
         const ratio = Math.min(target / img.width, target / img.height, 1);
         const w = Math.max(1, Math.round(img.width * ratio));
         const h = Math.max(1, Math.round(img.height * ratio));
@@ -98,21 +71,14 @@ function analyzeBrightness(dataUrl: string): Promise<BrightnessCheck> {
         const data = ctx.getImageData(0, 0, w, h).data;
         const samples: number[] = [];
         for (let i = 0; i < data.length; i += 4) {
-          // Rec. 601 luma
+          // Rec. 601 standard luma
           const luma =
             0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
           samples.push(luma);
         }
-        const sum = samples.reduce((a, b) => a + b, 0);
-        const avgLuma = samples.length ? sum / samples.length : 128;
-        const variance =
-          samples.reduce((acc, v) => acc + (v - avgLuma) ** 2, 0) /
-          Math.max(1, samples.length);
-        const stddev = Math.sqrt(variance);
-        const isAcceptable = avgLuma >= 35 && avgLuma <= 220 && stddev >= 8;
-        resolve({ avgLuma, stddev, isAcceptable });
+        resolve(analyzeLumaValues(samples));
       } catch (err) {
-        console.warn("Brightness analysis failed:", err);
+        console.warn("Lỗi phân tích độ sáng ảnh:", err);
         resolve({ avgLuma: 128, stddev: 30, isAcceptable: true });
       }
     };
@@ -123,14 +89,14 @@ function analyzeBrightness(dataUrl: string): Promise<BrightnessCheck> {
 }
 
 /**
- * Convert the current `<video>` frame into a JPEG Blob + data URL.
- * Falls back gracefully if `toBlob` is unsupported.
+ * Chụp khung hình từ thẻ <video> thành ảnh chân dung tự nhiên (JPEG Blob + dataUrl).
+ * Giữ nguyên màu sắc và nét mặt tự nhiên tỉ lệ 3:4, KHÔNG cắt xén viền đen,
+ * KHÔNG vẽ vòng tròn nhân tạo đè lên mặt người dùng.
  */
 function snapFrame(
   video: HTMLVideoElement,
   width: number,
   height: number,
-  oval: { cx: number; cy: number; rx: number; ry: number },
 ): Promise<{ blob: Blob; dataUrl: string }> {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement("canvas");
@@ -138,29 +104,23 @@ function snapFrame(
     canvas.height = height;
     const ctx = canvas.getContext("2d");
     if (!ctx) {
-      reject(new Error("Không thể khởi tạo canvas để chụp ảnh."));
+      reject(new Error("Không thể khởi tạo canvas đồ họa."));
       return;
     }
-    // Fill black background to avoid transparency artefacts.
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, width, height);
-    // Clip to the oval guide so the captured portrait is centered.
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(oval.cx, oval.cy, oval.rx, oval.ry, 0, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.clip();
-    ctx.drawImage(video, 0, 0, width, height);
-    ctx.restore();
-    // Re-add the oval outline so the saved JPEG always exposes the
-    // face framing — useful for human reviewers in the approval queue.
-    ctx.beginPath();
-    ctx.ellipse(oval.cx, oval.cy, oval.rx, oval.ry, 0, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(255,255,255,0.55)";
-    ctx.lineWidth = Math.max(2, width * 0.005);
-    ctx.stroke();
 
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    // 1. Áp dụng object-fit: cover để giữ tỉ lệ khuôn mặt chuẩn tự nhiên
+    const vw = video.videoWidth || width;
+    const vh = video.videoHeight || height;
+    const scale = Math.max(width / vw, height / vh);
+    const dx = (width - vw * scale) / 2;
+    const dy = (height - vh * scale) / 2;
+    const dw = vw * scale;
+    const dh = vh * scale;
+
+    // 2. Vẽ trực tiếp khung hình tự nhiên, không cắt đen xung quanh
+    ctx.drawImage(video, dx, dy, dw, dh);
+
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
     canvas.toBlob(
       (blob) => {
         if (!blob) {
@@ -170,7 +130,7 @@ function snapFrame(
         resolve({ blob, dataUrl });
       },
       "image/jpeg",
-      0.9,
+      0.95,
     );
   });
 }
@@ -178,13 +138,13 @@ function snapFrame(
 export default function WebcamCapture({
   onCapture,
   onReset,
-  aspectRatio = 4 / 3,
+  onCancel,
+  aspectRatio = 3 / 4,
   compact = false,
   fileUploadDisabled = true,
 }: WebcamCaptureProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const overlayRef = useRef<HTMLDivElement | null>(null);
 
   const [status, setStatus] = useState<CameraStatus>("idle");
   const [errorMsg, setErrorMsg] = useState<string>("");
@@ -192,154 +152,141 @@ export default function WebcamCapture({
   const [brightness, setBrightness] = useState<BrightnessCheck | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
-  const [oval, setOval] = useState({ cx: 0, cy: 0, rx: 0, ry: 0 });
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
 
-  // ----- Effect: open / close the camera stream based on `status` -----
+  // Kiểm tra thiết bị có nhiều camera (camera trước & sau trên điện thoại)
   useEffect(() => {
-    if (status !== "ready") {
-      // Stop any active stream when leaving "ready" state.
+    let active = true;
+    async function checkDevices() {
+      try {
+        if (navigator.mediaDevices?.enumerateDevices) {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter((d) => d.kind === "videoinput");
+          if (active) {
+            setHasMultipleCameras(videoDevices.length > 1);
+          }
+        }
+      } catch (err) {
+        console.warn("Không thể liệt kê thiết bị camera:", err);
+      }
+    }
+    checkDevices();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Giải phóng MediaStream tracks khi unmount
+  useEffect(() => {
+    return () => {
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
+        stopMediaStreamTracks(streamRef.current);
         streamRef.current = null;
       }
-      return;
-    }
+    };
+  }, []);
 
-    let cancelled = false;
-
-    async function start() {
-      try {
-        if (!navigator.mediaDevices?.getUserMedia) {
-          throw new Error("Trình duyệt không hỗ trợ getUserMedia.");
-        }
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: "user",
-            width: { ideal: 720 },
-            height: { ideal: 540 },
-          },
-          audio: false,
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play().catch(() => undefined);
-        }
-        setStatus("ready");
-      } catch (err: any) {
-        if (cancelled) return;
-        console.warn("Webcam init failed:", err);
-        const name = err?.name || "";
-        if (name === "NotAllowedError" || name === "SecurityError") {
-          setStatus("denied");
-          setErrorMsg(
-            "Bạn đã từ chối quyền truy cập Camera. Vui lòng bật quyền trong trình duyệt rồi thử lại.",
-          );
-        } else if (name === "NotFoundError" || name === "OverconstrainedError") {
-          setStatus("unavailable");
-          setErrorMsg(
-            "Không tìm thấy thiết bị Webcam trên máy tính. Vui lòng kiểm tra và thử lại.",
-          );
-        } else {
-          setStatus("error");
-          setErrorMsg(
-            err?.message ||
-              "Không thể khởi động Webcam. Vui lòng kiểm tra thiết bị và trình duyệt.",
-          );
-        }
-      }
+  // Khởi động Camera
+  const startCamera = useCallback(async (mode: "user" | "environment" = facingMode) => {
+    if (streamRef.current) {
+      stopMediaStreamTracks(streamRef.current);
+      streamRef.current = null;
     }
 
     setStatus("requesting");
-    start();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [status === "ready"]); // re-run only when transitioning to ready
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-        streamRef.current = null;
-      }
-    };
-  }, []);
-
-  // ----- Effect: recompute oval coordinates when overlay resizes -----
-  useEffect(() => {
-    const node = overlayRef.current;
-    if (!node) return;
-    const compute = () => {
-      const rect = node.getBoundingClientRect();
-      const width = rect.width;
-      const height = rect.height;
-      const cx = width / 2;
-      const cy = height / 2;
-      const ry = Math.min(height * 0.42, width / aspectRatio / 2);
-      const rx = ry * aspectRatio;
-      setOval({ cx, cy, rx, ry });
-    };
-    compute();
-    const ro = new ResizeObserver(compute);
-    ro.observe(node);
-    window.addEventListener("resize", compute);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", compute);
-    };
-  }, [aspectRatio]);
-
-  const openCamera = useCallback(() => {
+    setErrorMsg("");
     setSnapshotUrl(null);
     setBrightness(null);
-    setErrorMsg("");
-    setStatus("ready");
-  }, []);
 
+    const isSecure =
+      typeof window !== "undefined"
+        ? window.isSecureContext ||
+          window.location.hostname === "localhost" ||
+          window.location.hostname === "127.0.0.1"
+        : true;
+
+    try {
+      const stream = await requestMediaStreamWithFallback(
+        mode,
+        navigator.mediaDevices,
+        isSecure,
+      );
+
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.muted = true;
+        videoRef.current.playsInline = true;
+        try {
+          await videoRef.current.play();
+        } catch (playErr) {
+          console.warn("Lỗi tự động phát video:", playErr);
+        }
+      }
+
+      setStatus("ready");
+    } catch (err: any) {
+      console.warn("Khởi động camera thất bại:", err);
+      const classified = classifyCameraError(err, isSecure);
+      setStatus(classified.status);
+      setErrorMsg(classified.message);
+    }
+  }, [facingMode]);
+
+  // Đổi camera trước / sau (chuyên dụng trên điện thoại)
+  const toggleFacingMode = useCallback(() => {
+    const nextMode = facingMode === "user" ? "environment" : "user";
+    setFacingMode(nextMode);
+    startCamera(nextMode);
+  }, [facingMode, startCamera]);
+
+  // Dừng camera và đóng
+  const handleStopAndCancel = useCallback(() => {
+    if (streamRef.current) {
+      stopMediaStreamTracks(streamRef.current);
+      streamRef.current = null;
+    }
+    setStatus("idle");
+    onCancel?.();
+  }, [onCancel]);
+
+  // Chụp ảnh chân dung
   const performCapture = useCallback(async () => {
     const video = videoRef.current;
     if (!video || !streamRef.current) return;
-    if (oval.rx <= 0 || oval.ry <= 0) return;
 
-    // Respect aspect ratio = 4:3 for storage
+    // Chuẩn kích thước ảnh chân dung 3:4 chất lượng cao
     const targetW = 480;
-    const targetH = 360;
+    const targetH = Math.round(targetW / aspectRatio);
+
     try {
-      const captureWidth = video.videoWidth || targetW;
-      const captureHeight = video.videoHeight || targetH;
-      // Scale oval to the same coordinate space the captured canvas uses.
-      const sx = targetW / captureWidth;
-      const sy = targetH / captureHeight;
-      const capture = await snapFrame(video, targetW, targetH, {
-        cx: oval.cx * sx,
-        cy: oval.cy * sy,
-        rx: oval.rx * sx,
-        ry: oval.ry * sy,
-      });
+      const capture = await snapFrame(video, targetW, targetH);
+
+      // Tắt camera sau khi chụp để tiết kiệm pin
+      if (streamRef.current) {
+        stopMediaStreamTracks(streamRef.current);
+        streamRef.current = null;
+      }
+
       setSnapshotUrl(capture.dataUrl);
       setStatus("captured");
       setIsAnalyzing(true);
+
       const check = await analyzeBrightness(capture.dataUrl);
       setBrightness(check);
       setIsAnalyzing(false);
+
       onCapture(capture);
     } catch (err: any) {
-      console.error("Capture failed:", err);
-      setErrorMsg(
-        err?.message ||
-          "Không thể chụp ảnh, vui lòng thử lại trong điều kiện ánh sáng tốt hơn.",
-      );
+      console.error("Chụp ảnh thất bại:", err);
+      setErrorMsg(err?.message || "Lỗi xử lý ảnh chụp, vui lòng thử lại.");
       setStatus("ready");
     }
-  }, [oval.cx, oval.cy, oval.rx, oval.ry, onCapture]);
+  }, [aspectRatio, onCapture]);
 
+  // Hẹn giờ đếm ngược 3 giây
   const startCountdown = useCallback(() => {
     if (status !== "ready") return;
     setCountdown(3);
@@ -356,84 +303,84 @@ export default function WebcamCapture({
     }, 700);
   }, [status, performCapture]);
 
+  // Chụp lại
   const handleRetake = useCallback(() => {
     setSnapshotUrl(null);
     setBrightness(null);
-    setStatus("ready");
     onReset?.();
-  }, [onReset]);
+    startCamera(facingMode);
+  }, [onReset, startCamera, facingMode]);
 
-  // ----- Derived status flags -----
   const isLive = status === "ready";
   const isReviewing = status === "captured";
 
   const brightnessLabel = useMemo(() => {
     if (!brightness) return null;
     if (!brightness.isAcceptable) {
-      if (brightness.avgLuma < 35) return "Ảnh quá tối";
+      if (brightness.avgLuma < 35) return "Ảnh hơi tối";
       if (brightness.avgLuma > 220) return "Ảnh quá sáng / ngược sáng";
-      return "Vùng mặt chưa rõ nét";
+      return "Khuôn mặt chưa rõ nét";
     }
-    return "Độ sáng & nét mặt ổn";
+    return "Độ sáng & nét mặt đạt chuẩn";
   }, [brightness]);
 
   return (
-    <div
-      className={`flex w-full flex-col gap-3 ${
-        compact ? "text-xs" : "text-sm"
-      }`}
-    >
+    <div className={`flex w-full flex-col gap-3 ${compact ? "text-xs" : "text-sm"}`}>
+      {/* Khung hiển thị Camera Viewport (Tỉ lệ 3:4 chuẩn chân dung) */}
       <div
-        ref={overlayRef}
-        className={`relative w-full overflow-hidden rounded-2xl border-2 border-dashed bg-video-background shadow-md ${
-          compact ? "aspect-[4/3] max-h-72" : "aspect-[4/3]"
+        className={`relative w-full overflow-hidden rounded-2xl border border-border bg-slate-950 shadow-md ${
+          compact ? "aspect-[3/4] max-h-80" : "aspect-[3/4] max-w-sm mx-auto"
         }`}
-        style={{ borderColor: "var(--border)" }}
       >
-        {/* Live video preview */}
+        {/* Live Video */}
         {!isReviewing && (
           <video
             ref={videoRef}
             playsInline
             muted
             autoPlay
-            className={`h-full w-full object-cover transition-opacity ${
-              isLive ? "opacity-100" : "opacity-30"
+            className={`h-full w-full object-cover transition-opacity duration-300 ${
+              isLive ? "opacity-100" : "opacity-0"
             }`}
           />
         )}
 
-        {/* Snapshot preview after capture */}
+        {/* Khung xem trước ảnh chụp tự nhiên */}
         {isReviewing && snapshotUrl && (
           <img
             src={snapshotUrl}
-            alt="Ảnh chụp khuôn mặt xem trước"
+            alt="Ảnh chân dung đã chụp"
             className="h-full w-full object-cover animate-success-pop"
           />
         )}
 
-        {/* Idle / permission placeholder */}
-        {!isLive && !isReviewing && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-video-overlay/70 p-4 text-center text-muted-foreground">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border/70 bg-card text-primary">
+        {/* Trạng thái Chờ (Idle State) - Thiết kế thanh lịch, sáng rõ trên cả 2 theme */}
+        {status === "idle" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-muted/30 p-6 text-center backdrop-blur-xs">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-primary/40 bg-card text-primary shadow-xs">
               <Camera size={28} />
             </div>
-            <p className="font-semibold text-foreground text-xs">
-              {status === "requesting"
-                ? "Đang kết nối Webcam..."
-                : status === "denied"
-                ? "Quyền truy cập Camera bị từ chối"
-                : status === "unavailable"
-                ? "Không tìm thấy thiết bị Webcam"
-                : status === "error"
-                ? "Lỗi khởi động Webcam"
-                : "Bấm nút bên dưới để bật Webcam"}
-            </p>
-            {errorMsg && (
-              <p className="max-w-xs text-[11px] text-offline">{errorMsg}</p>
-            )}
+
+            <div className="space-y-1">
+              <p className="font-display font-bold text-foreground text-sm">
+                Chụp ảnh chân dung
+              </p>
+              <p className="text-xs text-muted-foreground max-w-xs">
+                Mở camera thiết bị để chụp ảnh chân dung khuôn mặt trực tiếp.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => startCamera(facingMode)}
+              className="focus-ring mt-1 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-bold text-primary-foreground shadow-sm hover:opacity-95 transition-all cursor-pointer"
+            >
+              <Camera size={15} />
+              Bật Camera chụp ảnh
+            </button>
+
             {fileUploadDisabled && (
-              <p className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-card px-2 py-0.5 text-[10px] text-muted-foreground">
+              <p className="mt-1 inline-flex items-center gap-1 rounded-full border border-border/60 bg-card/90 px-2.5 py-0.5 text-[10px] text-muted-foreground">
                 <Lock size={10} />
                 Tính năng tải file ảnh từ máy đã được khoá.
               </p>
@@ -441,130 +388,186 @@ export default function WebcamCapture({
           </div>
         )}
 
-        {/* Oval face guide (only when live) */}
-        {(isLive || isReviewing) && (
-          <div className="pointer-events-none absolute inset-0">
+        {/* Trạng thái Đang kết nối hoặc Bị lỗi (Luôn dùng text trắng nổi bật trên nền đen) */}
+        {status !== "idle" && !isLive && !isReviewing && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950/90 p-5 text-center text-white backdrop-blur-xs">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/20 bg-white/10 text-white shadow-sm">
+              {status === "requesting" ? (
+                <Loader2 size={28} className="animate-spin text-primary" />
+              ) : status === "insecure" ? (
+                <ShieldAlert size={28} className="text-amber-400" />
+              ) : (
+                <AlertTriangle size={28} className="text-red-400" />
+              )}
+            </div>
+
+            <div className="space-y-1 max-w-xs text-white">
+              <p className="font-bold text-sm text-white">
+                {status === "requesting"
+                  ? "Đang kết nối Camera..."
+                  : status === "denied"
+                  ? "Quyền Camera bị từ chối"
+                  : status === "unavailable"
+                  ? "Không tìm thấy thiết bị Camera"
+                  : status === "insecure"
+                  ? "Yêu cầu kết nối an toàn (HTTPS)"
+                  : "Lỗi khởi động Camera"}
+              </p>
+
+              <p className="text-[12px] text-slate-300">
+                {status === "requesting"
+                  ? "Trình duyệt đang mở camera, vui lòng xác nhận cấp quyền nếu được hỏi..."
+                  : errorMsg}
+              </p>
+            </div>
+
+            {status !== "requesting" && (
+              <div className="flex items-center gap-2 mt-1">
+                <button
+                  type="button"
+                  onClick={() => startCamera(facingMode)}
+                  className="focus-ring inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground shadow-sm hover:opacity-90 cursor-pointer"
+                >
+                  <Camera size={14} />
+                  Thử lại
+                </button>
+                {onCancel && (
+                  <button
+                    type="button"
+                    onClick={handleStopAndCancel}
+                    className="focus-ring inline-flex items-center gap-1.5 rounded-xl border border-white/30 bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/20 cursor-pointer"
+                  >
+                    Đóng
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Khung hướng dẫn Oval HUD mượt mà (Chỉ hiển thị khi đang live video) */}
+        {isLive && (
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+            {/* Lớp viền Oval HUD thanh lịch */}
             <div
-              className="absolute rounded-[50%] border-2 border-white/70 shadow-[0_0_0_9999px_rgba(7,9,12,0.55)]"
+              className="relative rounded-[50%] border-2 border-dashed border-white/80 shadow-[0_0_0_9999px_rgba(7,9,12,0.4)] transition-all"
               style={{
-                left: `${oval.cx - oval.rx}px`,
-                top: `${oval.cy - oval.ry}px`,
-                width: `${oval.rx * 2}px`,
-                height: `${oval.ry * 2}px`,
+                width: "72%",
+                height: "76%",
               }}
-            />
-            <div className="absolute left-1/2 top-2 -translate-x-1/2 rounded-full border border-white/60 bg-black/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">
-              Đặt khuôn mặt vào khung Oval
+            >
+              <div className="absolute left-1/2 -top-3 -translate-x-1/2 rounded-full border border-white/40 bg-black/75 px-2.5 py-0.5 text-[9px] font-bold tracking-wider text-white uppercase backdrop-blur-xs shadow-xs">
+                Đặt khuôn mặt vào đây
+              </div>
             </div>
           </div>
         )}
 
-        {/* Countdown overlay */}
+        {/* Nút lật camera trước / sau (Đặc thù điện thoại) */}
+        {isLive && hasMultipleCameras && (
+          <button
+            type="button"
+            onClick={toggleFacingMode}
+            className="focus-ring absolute top-3 right-3 z-10 flex h-9 w-9 items-center justify-center rounded-xl border border-white/40 bg-black/60 text-white hover:bg-black/85 transition-colors backdrop-blur-xs cursor-pointer shadow-md"
+            title="Đổi camera trước / sau"
+            aria-label="Đổi camera trước / sau"
+          >
+            <SwitchCamera size={18} />
+          </button>
+        )}
+
+        {/* Nút đóng camera khi đang live */}
+        {isLive && onCancel && (
+          <button
+            type="button"
+            onClick={handleStopAndCancel}
+            className="focus-ring absolute top-3 left-3 z-10 flex h-9 w-9 items-center justify-center rounded-xl border border-white/40 bg-black/60 text-white hover:bg-black/85 transition-colors backdrop-blur-xs cursor-pointer shadow-md"
+            title="Đóng camera"
+            aria-label="Đóng camera"
+          >
+            <X size={18} />
+          </button>
+        )}
+
+        {/* Màn hình đếm ngược */}
         {countdown !== null && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-xs">
             <span className="font-display text-7xl font-black text-white drop-shadow-lg animate-success-pop">
               {countdown}
             </span>
           </div>
         )}
 
-        {/* Analyzing overlay during brightness check */}
+        {/* Trạng thái phân tích chất lượng ảnh */}
         {isAnalyzing && isReviewing && (
-          <div className="absolute inset-x-0 bottom-2 flex items-center justify-center">
-            <span className="inline-flex items-center gap-1 rounded-full border border-border bg-black/70 px-2 py-0.5 text-[10px] font-medium text-white">
-              <Loader2 size={11} className="animate-spin" />
-              Đang phân tích chất lượng ảnh...
+          <div className="absolute inset-x-0 bottom-3 flex items-center justify-center">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/80 px-3 py-1 text-[11px] font-medium text-white backdrop-blur-xs shadow-md">
+              <Loader2 size={13} className="animate-spin text-primary" />
+              Đang phân tích chất lượng ảnh AI...
             </span>
           </div>
         )}
       </div>
 
-      {/* AI Photo Guidelines checklist */}
-      <div className="rounded-xl border border-border/70 bg-muted/30 p-3 space-y-1.5 text-[11px] text-muted-foreground">
-        <p className="inline-flex items-center gap-1 font-semibold uppercase tracking-wider text-foreground">
-          <Lightbulb size={12} className="text-secondary" /> Hướng dẫn đặt khuôn mặt
-        </p>
-        <ul className="space-y-1">
-          <li className="flex items-start gap-1.5">
-            <CheckCircle2 size={11} className="mt-0.5 shrink-0 text-online" />
-            <span>Đặt khuôn mặt trực diện giữa khung Oval, nhìn thẳng vào camera.</span>
-          </li>
-          <li className="flex items-start gap-1.5">
-            <CheckCircle2 size={11} className="mt-0.5 shrink-0 text-online" />
-            <span>Ánh sáng đều, không bị ngược sáng, không đeo khẩu trang / kính râm.</span>
-          </li>
-          <li className="flex items-start gap-1.5">
-            <CheckCircle2 size={11} className="mt-0.5 shrink-0 text-online" />
-            <span>Giữ yên khoảng 1–2 giây trước khi bấm chụp để ảnh không bị mờ.</span>
-          </li>
-        </ul>
-      </div>
-
-      {/* Brightness readout after capture */}
+      {/* Đánh giá độ sáng & độ nét sau khi chụp */}
       {isReviewing && brightness && brightnessLabel && (
         <div
-          className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs ${
+          className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs transition-all max-w-sm mx-auto w-full ${
             brightness.isAcceptable
-              ? "border-online/40 bg-online/10 text-online"
-              : "border-offline/40 bg-offline/10 text-offline"
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+              : "border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400"
           }`}
         >
           {brightness.isAcceptable ? (
-            <CheckCircle2 size={14} className="shrink-0" />
+            <CheckCircle2 size={15} className="shrink-0" />
           ) : (
-            <AlertTriangle size={14} className="shrink-0" />
+            <AlertTriangle size={15} className="shrink-0" />
           )}
           <span className="font-semibold">{brightnessLabel}</span>
           <span className="ml-auto text-[10px] text-muted-foreground">
-            Luma={Math.round(brightness.avgLuma)} · σ=
-            {brightness.stddev.toFixed(1)}
+            Luma={Math.round(brightness.avgLuma)} · σ={brightness.stddev.toFixed(1)}
           </span>
         </div>
       )}
 
-      {/* Action row */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          {!isLive && !isReviewing && (
-            <button
-              type="button"
-              onClick={openCamera}
-              className="focus-ring inline-flex items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-xs font-bold text-primary hover:bg-primary/20 transition-colors cursor-pointer"
-            >
-              <Camera size={14} />
-              Bật Webcam chụp ảnh
-            </button>
-          )}
-
+      {/* Thanh nút bấm hành động (Action Controls - Chỉ hiện khi đang Live hoặc đang Xem lại) */}
+      {(isLive || isReviewing) && (
+        <div className="flex items-center justify-center gap-2 max-w-sm mx-auto w-full pt-1">
           {isLive && (
-            <button
-              type="button"
-              onClick={startCountdown}
-              className="focus-ring inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 shadow-sm transition-all cursor-pointer"
-            >
-              <Camera size={14} />
-              Chụp ảnh ngay
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={performCapture}
+                className="focus-ring flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:opacity-90 shadow-sm transition-all cursor-pointer"
+              >
+                <Camera size={15} />
+                Chụp ảnh ngay
+              </button>
+
+              <button
+                type="button"
+                onClick={startCountdown}
+                className="focus-ring inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
+                title="Hẹn giờ 3 giây rồi tự động chụp"
+              >
+                <Timer size={15} />
+                Hẹn giờ 3s
+              </button>
+            </>
           )}
 
           {isReviewing && (
             <button
               type="button"
               onClick={handleRetake}
-              className="focus-ring inline-flex items-center gap-1.5 rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer"
+              className="focus-ring flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-semibold text-foreground hover:bg-muted transition-colors cursor-pointer shadow-xs"
             >
               <RefreshCw size={14} />
-              Chụp lại
+              Chụp lại bằng Camera
             </button>
           )}
         </div>
-
-        {fileUploadDisabled && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-1 text-[10px] font-medium text-muted-foreground">
-            <Lock size={10} /> Tải file ảnh đã bị khoá
-          </span>
-        )}
-      </div>
+      )}
     </div>
   );
 }

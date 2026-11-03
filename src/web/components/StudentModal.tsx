@@ -97,7 +97,7 @@ function StudentModalForm({
     }
     if (!webcamBlob && !formData.portrait_url) {
       setErrorMsg(
-        "Vui lòng bật Webcam chụp ảnh khuôn mặt trước khi lưu hồ sơ.",
+        "Vui lòng bật Camera chụp ảnh khuôn mặt trước khi lưu hồ sơ.",
       );
       return;
     }
@@ -208,7 +208,7 @@ function StudentModalForm({
           <div>
             <p className="font-semibold">Đã gửi hồ sơ vào bảng chờ duyệt.</p>
             <p className="mt-0.5 text-[11px]">
-              Quản trị viên sẽ xem xét và duyệt ảnh Webcam trên trang "Phê duyệt hồ sơ".
+              Quản trị viên sẽ xem xét và duyệt ảnh Camera trên trang "Phê duyệt hồ sơ".
             </p>
           </div>
         </div>
@@ -232,12 +232,12 @@ function StudentModalForm({
               {/* KHÔNG còn `<input type="file">` ở đây — đã bị khoá. */}
               {previewUrl && !webcamPreviewUrl && (
                 <p className="text-[11px] text-muted-foreground">
-                  Ảnh chân dung hiện tại đã được lưu trước đó. Bạn có thể chụp lại ảnh Webcam bên dưới để thay thế.
+                  Ảnh chân dung hiện tại đã được lưu trước đó. Bạn có thể chụp lại ảnh Camera bên dưới để thay thế.
                 </p>
               )}
               {!previewUrl && !webcamPreviewUrl && (
                 <p className="text-[11px] text-muted-foreground">
-                  Bật Webcam và chụp ảnh khuôn mặt trực diện để hệ thống AI nhận diện.
+                  Bật Camera và chụp ảnh khuôn mặt trực diện để hệ thống AI nhận diện.
                 </p>
               )}
             </div>
