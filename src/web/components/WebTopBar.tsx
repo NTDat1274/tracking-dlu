@@ -10,6 +10,7 @@ const TITLES: Record<WebPage, string> = {
   analytics: "Phân tích số liệu",
   visits: "Lịch sử lượt đến",
   students: "Hồ sơ sinh viên",
+  approval: "Phê duyệt hồ sơ sinh viên",
   settings: "Cấu hình hệ thống",
 };
 
@@ -54,7 +55,7 @@ export default function WebTopBar({
           <button
             type="button"
             onClick={onOpenStudentPortal}
-            className="focus-ring flex items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/10 p-2 sm:px-3 sm:py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors cursor-pointer shadow-xs"
+            className="focus-ring flex items-center gap-1.5 rounded-xl border border-primary/40 bg-primary/10 p-2 sm:px-3 sm:py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer shadow-xs"
             title="Xem trước giao diện Cổng thông tin Sinh viên"
             aria-label="Xem trước Cổng sinh viên"
           >
@@ -68,7 +69,7 @@ export default function WebTopBar({
 
         {/* User Role Badge */}
         {user && (
-          <div className="hidden items-center gap-2 rounded-xl border border-border bg-background/60 px-3 py-1.5 sm:flex">
+          <div className="hidden items-center gap-2 rounded-xl border border-border bg-background/60 px-3 py-1.5 sm:flex transition-colors">
             <span
               className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
                 role === "admin"
@@ -90,7 +91,7 @@ export default function WebTopBar({
           <button
             type="button"
             onClick={onExport}
-            className="focus-ring flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 shadow-sm transition-opacity cursor-pointer"
+            className="focus-ring flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] shadow-sm transition-all duration-200 cursor-pointer"
           >
             <Download size={16} />
             <span>Xuất báo cáo</span>

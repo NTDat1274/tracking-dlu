@@ -1,5 +1,7 @@
 // src/web/pages/StudentPortalPage.tsx
-// Cổng Thông Tin Sinh Viên DLU - Tự khai báo hồ sơ, tải ảnh khuôn mặt chuẩn AI InsightFace và tra cứu lịch sử.
+// Cổng Thông Tin Sinh Viên DLU - Tự khai báo hồ sơ, chụp ảnh khuôn mặt trực
+// tiếp qua Webcam (Task 4.1) chuẩn AI InsightFace, gửi vào bảng
+// `pending_students` chờ Admin phê duyệt và tra cứu lịch sử.
 // Tuân thủ toàn diện: ui-ux-pro-max, frontend-design, vercel-react-best-practices, web-design-guidelines.
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../../context/AuthContext";
@@ -8,10 +10,12 @@ import {
   saveStudentSelfProfile,
   fetchStudentPersonalProfile,
   fetchStudentPersonalVisits,
+  submitPendingStudent,
 } from "../../lib/supabase";
 import { StudentAvatar } from "../components/AvatarFallback";
 import StatusBadge from "../components/StatusBadge";
 import ThemeSwitcher from "../components/ThemeSwitcher";
+import WebcamCapture from "../components/WebcamCapture";
 import {
   fmtDateTime,
   fmtDuration,
@@ -19,7 +23,6 @@ import {
 } from "../../data/types";
 import {
   GraduationCap,
-  Upload,
   CheckCircle2,
   AlertCircle,
   Clock,
@@ -30,6 +33,7 @@ import {
   Calendar,
   Sparkles,
   Info,
+  Hourglass,
 } from "lucide-react";
 
 interface StudentPortalPageProps {
@@ -50,11 +54,15 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
   const [portraitUrl, setPortraitUrl] = useState("");
 
   // Upload & Form state
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  // Task 4.1: Ảnh chân dung nay CHỈ được phép chụp trực tiếp qua Webcam
+  // (`WebcamCapture`). Mọi luồng upload file tự do từ máy tính đã bị khoá.
+  const [webcamBlob, setWebcamBlob] = useState<Blob | null>(null);
+  const [webcamPreviewUrl, setWebcamPreviewUrl] = useState<string>("");
   const [previewUrl, setPreviewUrl] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
+  const [submissionState, setSubmissionState] = useState<"idle" | "pending" | "approved">("idle");
 
   // History & Metrics state
   const [visits, setVisits] = useState<VisitRecord[]>([]);
@@ -140,21 +148,24 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
     };
   }, [account?.student_id]);
 
-  // Handle local photo selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith("image/")) {
-        setFormError("Vui lòng chọn file hình ảnh (JPG, PNG, WEBP).");
-        return;
-      }
-      setSelectedFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
-      setFormError("");
-    }
-  };
+  // Handle Webcam capture from <WebcamCapture /> component
+  // Task 4.1: file upload tự do đã bị KHÓA. Ảnh chỉ tới từ Webcam.
+  const handleWebcamCapture = useCallback(({ blob, dataUrl }: { blob: Blob; dataUrl: string }) => {
+    setWebcamBlob(blob);
+    setWebcamPreviewUrl(dataUrl);
+    setPreviewUrl(dataUrl);
+    setFormError("");
+  }, []);
 
-  // Submit profile to Supabase & Cloudinary
+  const handleWebcamReset = useCallback(() => {
+    setWebcamBlob(null);
+    setWebcamPreviewUrl("");
+    setPreviewUrl(portraitUrl || "");
+    setFormError("");
+  }, [portraitUrl]);
+
+  // Submit profile -> Upload ảnh Webcam lên Cloudinary -> Lưu vào
+  // bảng tạm `pending_students` (status='pending') chờ Admin duyệt.
   const handleSubmitProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
@@ -173,8 +184,10 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
       setFormError("Vui lòng nhập Họ và tên sinh viên.");
       return;
     }
-    if (!previewUrl && !portraitUrl && !selectedFile) {
-      setFormError("Vui lòng tải lên ảnh chân dung khuôn mặt để hệ thống AI nhận diện.");
+    if (!webcamBlob && !portraitUrl) {
+      setFormError(
+        "Vui lòng bật Webcam và chụp ảnh khuôn mặt trực diện trước khi gửi hồ sơ.",
+      );
       return;
     }
 
@@ -186,10 +199,13 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
     setIsSubmitting(true);
     let finalImageUrl = portraitUrl;
 
-    // 1. Upload photo to Cloudinary if new file selected
-    if (selectedFile) {
+    // 1. Upload ảnh chụp Webcam lên Cloudinary (nếu có frame mới)
+    if (webcamBlob) {
       try {
-        const uploadRes = await uploadImageToCloudinary(selectedFile);
+        const file = new File([webcamBlob], "webcam-capture.jpg", {
+          type: "image/jpeg",
+        });
+        const uploadRes = await uploadImageToCloudinary(file);
         if (uploadRes.success && uploadRes.url) {
           finalImageUrl = uploadRes.url;
           setPortraitUrl(uploadRes.url);
@@ -205,7 +221,26 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
       }
     }
 
-    // 2. Save to Supabase and link to user account
+    // 2. Ghi nhận hồ sơ vào bảng tạm pending_students (status='pending')
+    //    chờ Admin phê duyệt. Đây là điểm khác biệt lớn so với Task cũ:
+    //    hồ sơ KHÔNG được ghi thẳng vào bảng `students` chính.
+    const pendingRes = await submitPendingStudent({
+      student_id: cleanStuId,
+      full_name: cleanName,
+      class_name: cleanClass,
+      email: cleanEmail,
+      portrait_url: finalImageUrl,
+      submitted_by: user.id,
+    });
+
+    if (!pendingRes.success) {
+      setFormError(pendingRes.error || "Lỗi gửi hồ sơ chờ duyệt.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    // 3. Liên kết student_id với tài khoản (giúp sinh viên xem được lịch
+    //    sử ra/vào của chính mình sau khi Admin duyệt).
     const saveRes = await saveStudentSelfProfile({
       student_id: cleanStuId,
       full_name: cleanName,
@@ -218,7 +253,10 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
     setIsSubmitting(false);
 
     if (saveRes.success) {
-      setFormSuccess("Hồ sơ sinh viên và ảnh AI đã được lưu thành công vào hệ thống!");
+      setFormSuccess(
+        "Hồ sơ & ảnh chụp Webcam đã gửi đến bảng chờ duyệt. Quản trị viên sẽ phê duyệt trong ít phút.",
+      );
+      setSubmissionState("pending");
       await refreshAccount();
       // Reload visits in case they were mapped to this student ID
       loadData(cleanStuId);
@@ -337,6 +375,29 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
               </button>
             </div>
           )}
+
+          {/* Task 4.1: Banner "Đang chờ Admin duyệt" hiển thị khi sinh viên
+              vừa gửi hồ sơ qua Webcam nhưng Admin chưa phê duyệt. */}
+          {submissionState === "pending" && (
+            <div className="rounded-2xl border border-secondary/40 bg-secondary/10 p-4 sm:p-5 flex items-start gap-3 animate-fade-in-up">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary/20 text-secondary mt-0.5">
+                <Hourglass size={20} />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="font-display text-sm font-bold text-foreground">
+                    Hồ sơ Webcam đang chờ Admin phê duyệt
+                  </h2>
+                  <span className="rounded-full bg-secondary/20 px-2 py-0.5 text-[10px] font-bold text-secondary">
+                    Đang xử lý
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Ảnh chụp Webcam đã được gửi vào bảng tạm <strong className="font-mono">pending_students</strong>. Quản trị viên sẽ xem xét và duyệt trong ít phút.
+                </p>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Tab Navigation Segmented Bar */}
@@ -350,7 +411,7 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
             role="tab"
             aria-selected={activeTab === "profile"}
             onClick={() => setActiveTab("profile")}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold transition-all cursor-pointer ${
+            className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold transition-all duration-200 hover:scale-[1.01] active:scale-[0.98] cursor-pointer ${
               activeTab === "profile"
                 ? "bg-card text-foreground shadow-sm ring-1 ring-border"
                 : "text-muted-foreground hover:text-foreground"
@@ -364,7 +425,7 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
             role="tab"
             aria-selected={activeTab === "history"}
             onClick={() => setActiveTab("history")}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold transition-all cursor-pointer ${
+            className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold transition-all duration-200 hover:scale-[1.01] active:scale-[0.98] cursor-pointer ${
               activeTab === "history"
                 ? "bg-card text-foreground shadow-sm ring-1 ring-border"
                 : "text-muted-foreground hover:text-foreground"
@@ -377,7 +438,7 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
 
         {/* TAB 1: PROFILE & FACE PORTRAIT UPLOAD */}
         {activeTab === "profile" && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div key="profile" className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-page-enter">
             {/* Left Column: Portrait Upload Guide & Preview (5 cols) */}
             <div className="lg:col-span-5 rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-5">
               <div className="border-b border-border/60 pb-3">
@@ -390,48 +451,32 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
                 </p>
               </div>
 
-              {/* Photo Frame with Face Guide */}
-              <div className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/80 bg-background/50 p-6 text-center group hover:border-primary/60 transition-colors">
-                {previewUrl ? (
+              {/* Photo Frame with Webcam Guide (Task 4.1) */}
+              <div className="relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/80 bg-background/50 p-3 text-center group hover:border-primary/60 transition-colors">
+                {previewUrl && !webcamPreviewUrl ? (
                   <div className="relative">
                     <img
                       src={previewUrl}
-                      alt="Ảnh chân dung xem trước"
+                      alt="Ảnh chân dung hiện tại"
                       className="h-48 w-36 rounded-xl object-cover shadow-md border-2 border-primary/40"
                     />
                     <div className="absolute inset-0 rounded-xl ring-2 ring-primary/30 pointer-events-none" />
                   </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-6">
-                    <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground mb-3">
-                      <Camera size={32} />
-                    </div>
-                    <p className="text-xs font-semibold text-foreground">
-                      Chưa có ảnh chân dung
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-1 max-w-[200px]">
-                      Bấm nút bên dưới để chọn ảnh thẻ hoặc ảnh chụp trực diện
-                    </p>
+                ) : null}
+
+                <div className="w-full">
+                  <WebcamCapture
+                    onCapture={handleWebcamCapture}
+                    onReset={handleWebcamReset}
+                  />
+                </div>
+
+                {webcamPreviewUrl && (
+                  <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-online/40 bg-online/10 px-2.5 py-0.5 text-[11px] font-semibold text-online">
+                    <Camera size={12} />
+                    Đã chụp ảnh Webcam — sẵn sàng gửi duyệt.
                   </div>
                 )}
-
-                {/* Upload action button */}
-                <div className="mt-4 w-full">
-                  <input
-                    type="file"
-                    id="student-portrait-file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="student-portrait-file"
-                    className="focus-ring flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 text-xs font-bold text-primary hover:bg-primary/20 transition-colors cursor-pointer"
-                  >
-                    <Upload size={15} />
-                    <span>{previewUrl ? "Thay đổi ảnh khác" : "Chọn ảnh từ thiết bị"}</span>
-                  </label>
-                </div>
               </div>
 
               {/* AI Photo Guidelines Checklist (ui-ux-pro-max & swiss modernism) */}
@@ -478,7 +523,15 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
               {formSuccess && (
                 <div className="rounded-xl border border-online/40 bg-online/10 p-3.5 text-xs text-online flex items-start gap-2">
                   <CheckCircle2 size={16} className="shrink-0 mt-0.5" />
-                  <span>{formSuccess}</span>
+                  <div className="space-y-0.5">
+                    <span className="font-semibold">
+                      {formSuccess}
+                    </span>
+                    <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-online/90">
+                      <Hourglass size={11} />
+                      Trạng thái: Đang chờ Admin duyệt · Camera AI sẽ tự động nhận diện sau khi được duyệt.
+                    </span>
+                  </div>
                 </div>
               )}
 
@@ -580,7 +633,7 @@ export default function StudentPortalPage({ onBackToAdmin }: StudentPortalPagePr
 
         {/* TAB 2: PERSONAL VISIT HISTORY */}
         {activeTab === "history" && (
-          <div className="space-y-6 animate-fade-in">
+          <div key="history" className="space-y-6 animate-page-enter">
             {/* KPI Cards for Student */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-xs">

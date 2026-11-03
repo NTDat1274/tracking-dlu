@@ -466,9 +466,9 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
-      className="m-auto rounded-lg border border-border bg-card p-0 shadow-xl backdrop:bg-black/40"
+      className="m-auto rounded-2xl border border-border bg-card p-0 shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-sm open:animate-modal-zoom"
     >
-      <div onClick={(e) => e.stopPropagation()} className="w-[85vw] max-w-[380px] p-5">
+      <div onClick={(e) => e.stopPropagation()} className="w-[85vw] max-w-[380px] p-5 animate-modal-zoom">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Xuất Dữ Liệu</p>
         <h2 id="export-dialog-title" className="font-display text-base font-semibold text-foreground">
           Xuất Event Log
@@ -595,14 +595,14 @@ export default function ExportModal({ open, onClose }: ExportModalProps) {
           type="button"
           onClick={handleExport}
           disabled={exporting || orderedActiveSections.length === 0}
-          className="focus-ring mt-4 w-full rounded-md bg-primary py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+          className="focus-ring mt-4 w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 hover:scale-[1.01] active:scale-[0.98] shadow-sm disabled:opacity-60 transition-all duration-200 cursor-pointer"
         >
           {exporting ? "Đang xử lý..." : `Xuất ${format}`}
         </button>
         <button
           type="button"
           onClick={handleClose}
-          className="focus-ring mt-2 w-full rounded-md py-1.5 text-sm text-muted-foreground hover:bg-muted"
+          className="focus-ring mt-2 w-full rounded-xl py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground hover:scale-[1.01] active:scale-[0.98] transition-all duration-200 cursor-pointer"
         >
           Hủy
         </button>

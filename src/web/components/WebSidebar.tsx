@@ -3,13 +3,14 @@ import type { WebPage } from "./WebApp";
 import { useAuth } from "../../context/AuthContext";
 
 import React from "react";
-import { LayoutDashboard, BarChart2, Clock, Users, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, BarChart2, Clock, Users, UserCheck, Settings, LogOut } from "lucide-react";
 
 const NAV_ITEMS: { key: WebPage; label: string; icon: React.ReactNode }[] = [
   { key: "overview", label: "Tổng quan", icon: <LayoutDashboard size={20} /> },
   { key: "analytics", label: "Phân tích số liệu", icon: <BarChart2 size={20} /> },
   { key: "visits", label: "Lịch sử lượt đến", icon: <Clock size={20} /> },
   { key: "students", label: "Quản lý sinh viên", icon: <Users size={20} /> },
+  { key: "approval", label: "Phê duyệt hồ sơ", icon: <UserCheck size={20} /> },
   { key: "settings", label: "Cấu hình Cloud", icon: <Settings size={20} /> },
 ];
 
@@ -67,13 +68,13 @@ export default function WebSidebar({
                   onNavigate(item.key);
                   onCloseDrawer();
                 }}
-                className={`focus-ring flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all ${
+                className={`focus-ring flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all duration-200 hover:scale-[1.01] active:scale-[0.98] cursor-pointer ${
                   active
-                    ? "bg-primary text-primary-foreground shadow-sm"
+                    ? "bg-primary text-primary-foreground shadow-sm font-bold"
                     : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                 } ${collapsed ? "justify-center" : ""}`}
               >
-                <span aria-hidden="true" className="w-5 text-center text-sm">{item.icon}</span>
+                <span aria-hidden="true" className="w-5 text-center text-sm shrink-0 transition-transform duration-200 group-hover:scale-110">{item.icon}</span>
                 {!collapsed && <span>{item.label}</span>}
               </button>
             );
@@ -98,7 +99,7 @@ export default function WebSidebar({
           }}
           title="Đăng xuất"
           aria-label="Đăng xuất"
-          className={`focus-ring flex w-full items-center gap-2.5 rounded-xl border border-offline/30 bg-offline/10 px-3 py-2 text-xs font-semibold text-offline hover:bg-offline/20 transition-colors ${
+          className={`focus-ring flex w-full items-center gap-2.5 rounded-xl border border-offline/30 bg-offline/10 px-3 py-2 text-xs font-semibold text-offline hover:bg-offline/20 hover:scale-[1.01] active:scale-[0.98] transition-all duration-200 cursor-pointer ${
             collapsed ? "justify-center" : ""
           }`}
         >
@@ -126,9 +127,9 @@ export default function WebSidebar({
           <button
             aria-label="Đóng menu"
             onClick={onCloseDrawer}
-            className="absolute inset-0 bg-black/70 backdrop-blur-xs"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-200 animate-fade-in cursor-pointer"
           />
-          <aside className="absolute inset-y-0 left-0 w-64 bg-card shadow-2xl">{content}</aside>
+          <aside className="absolute inset-y-0 left-0 w-64 bg-card shadow-2xl animate-drawer-left">{content}</aside>
         </div>
       )}
     </>

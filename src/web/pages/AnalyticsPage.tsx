@@ -159,8 +159,12 @@ export default function AnalyticsPage({ filters, onFiltersChange, onReset }: Ana
       ) : (
         <>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {insights.map((insight) => (
-              <div key={insight.title} className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+            {insights.map((insight, idx) => (
+              <div
+                key={insight.title}
+                style={{ animationDelay: `${idx * 90}ms` }}
+                className="rounded-2xl border border-border bg-card p-5 shadow-xs transition-all duration-200 hover:border-primary/40 hover:scale-[1.01] hover:shadow-sm animate-item-enter"
+              >
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   {insight.title}
                 </p>
@@ -171,7 +175,7 @@ export default function AnalyticsPage({ filters, onFiltersChange, onReset }: Ana
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-xs transition-all duration-200 hover:border-primary/40 animate-item-enter" style={{ animationDelay: "200ms" }}>
               <h2 className="mb-3 font-display text-sm font-bold text-foreground">Lượt theo giờ</h2>
               <BarChart
                 data={hourlyData}
@@ -179,7 +183,7 @@ export default function AnalyticsPage({ filters, onFiltersChange, onReset }: Ana
               />
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-xs transition-all duration-200 hover:border-primary/40 animate-item-enter" style={{ animationDelay: "350ms" }}>
               <h2 className="mb-3 font-display text-sm font-bold text-foreground">Phân loại trạng thái (DLU Brand)</h2>
               <DonutChart
                 title="Phân loại trạng thái"
@@ -187,7 +191,7 @@ export default function AnalyticsPage({ filters, onFiltersChange, onReset }: Ana
               />
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-xs transition-all duration-200 hover:border-primary/40 animate-item-enter" style={{ animationDelay: "500ms" }}>
               <h2 className="mb-3 font-display text-sm font-bold text-foreground">Xu hướng 7 ngày gần nhất</h2>
               <BarChart
                 data={hourlyData}
@@ -195,7 +199,7 @@ export default function AnalyticsPage({ filters, onFiltersChange, onReset }: Ana
               />
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-xs transition-all duration-200 hover:border-primary/40 animate-item-enter" style={{ animationDelay: "650ms" }}>
               <h2 className="mb-3 font-display text-sm font-bold text-foreground">Bản đồ giờ cao điểm (Heatmap)</h2>
               <HeatmapGrid
                 title="Bản đồ giờ cao điểm theo Thứ/Giờ"

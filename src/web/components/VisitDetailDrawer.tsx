@@ -33,12 +33,12 @@ export default function VisitDetailDrawer({ record, onClose }: VisitDetailDrawer
     <>
       <div className="fixed inset-0 z-50 overflow-hidden">
         <div
-          className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-300"
+          className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 animate-fade-in"
           onClick={onClose}
         />
 
         <div className="absolute inset-y-0 right-0 flex max-w-full">
-          <div className="w-[85vw] max-w-[400px] transform bg-card shadow-2xl transition-transform duration-300 sm:w-[450px] sm:max-w-[450px]">
+          <div className="w-[85vw] max-w-[400px] bg-card shadow-2xl animate-drawer-right sm:w-[450px] sm:max-w-[450px] border-l border-border">
             {/* Drawer Header */}
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
               <h2 className="font-display text-sm font-bold text-foreground">Chi tiết bản ghi</h2>

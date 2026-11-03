@@ -1,6 +1,6 @@
 // src/web/components/WebApp.tsx
 // Centralized state owner, namespaced per page to avoid cross-page filter bleed.
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import WebSidebar from "./WebSidebar";
 import WebTopBar from "./WebTopBar";
 import { ChevronRight, ChevronLeft } from "lucide-react";
@@ -10,17 +10,24 @@ import AnalyticsPage from "../pages/AnalyticsPage";
 import VisitsPage from "../pages/VisitsPage";
 import StudentsPage from "../pages/StudentsPage";
 import SettingsPage from "../pages/SettingsPage";
+import StudentApprovalPage from "../pages/StudentApprovalPage";
 import LoginPage from "../pages/LoginPage";
 import StudentPortalPage from "../pages/StudentPortalPage";
 import LecturerPortalPage from "../pages/LecturerPortalPage";
 import VisitDetailDrawer from "./VisitDetailDrawer";
-import { useAuth, getDefaultLandingPathForRole } from "../../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import type { AnalyticsFilterState } from "./filters/AnalyticsFilterBar";
 import type { VisitFilterState } from "./filters/VisitFilterBar";
 import type { StudentFilterState } from "./filters/StudentFilterBar";
 import type { VisitRecord } from "../../data/types";
 
-export type WebPage = "overview" | "analytics" | "visits" | "students" | "settings";
+export type WebPage =
+  | "overview"
+  | "analytics"
+  | "visits"
+  | "students"
+  | "approval"
+  | "settings";
 export type WebModal = "export" | null;
 
 const getTodayStr = () => new Date().toISOString().split("T")[0];
@@ -112,15 +119,21 @@ export default function WebApp() {
   // Toàn bộ định tuyến nội bộ admin do state `page` điều khiển; URL pathname
   // không còn là nguồn chính, do đó không xảy ra vòng lặp re-render.
   if (!user) {
-    return <LoginPage />;
+    return (
+      <div className="animate-page-enter h-full w-full">
+        <LoginPage />
+      </div>
+    );
   }
 
   // Student Route Guard or Admin Preview
   if (role === "student" || previewStudentPortal) {
     return (
-      <StudentPortalPage
-        onBackToAdmin={() => setPreviewStudentPortal(false)}
-      />
+      <div className="animate-page-enter h-full w-full">
+        <StudentPortalPage
+          onBackToAdmin={() => setPreviewStudentPortal(false)}
+        />
+      </div>
     );
   }
 
@@ -129,12 +142,20 @@ export default function WebApp() {
   // (2) Tra cứu lịch sử ra/vào khoa (read-only). Không có quyền
   // thêm/sửa/xóa dữ liệu sinh viên hay cấu hình hệ thống như Admin.
   if (role === "lecturer") {
-    return <LecturerPortalPage />;
+    return (
+      <div className="animate-page-enter h-full w-full">
+        <LecturerPortalPage />
+      </div>
+    );
   }
 
   // Only render Admin Dashboard if role is strictly 'admin'
   if (role !== "admin") {
-    return <LoginPage />;
+    return (
+      <div className="animate-page-enter h-full w-full">
+        <LoginPage />
+      </div>
+    );
   }
 
   return (
@@ -156,52 +177,56 @@ export default function WebApp() {
         />
 
         <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-          {page === "overview" && (
-            <OverviewPage
-              onViewWaitingList={goToWaitingList}
-              onSelectRecord={setSelectedRecord}
-            />
-          )}
+          <div key={page} className="animate-page-enter">
+            {page === "overview" && (
+              <OverviewPage
+                onViewWaitingList={goToWaitingList}
+                onSelectRecord={setSelectedRecord}
+              />
+            )}
 
-          {page === "analytics" && (
-            <AnalyticsPage
-              filters={analyticsFilters}
-              onFiltersChange={setAnalyticsFilters}
-              onReset={() => setAnalyticsFilters(DEFAULT_ANALYTICS_FILTERS)}
-            />
-          )}
+            {page === "analytics" && (
+              <AnalyticsPage
+                filters={analyticsFilters}
+                onFiltersChange={setAnalyticsFilters}
+                onReset={() => setAnalyticsFilters(DEFAULT_ANALYTICS_FILTERS)}
+              />
+            )}
 
-          {page === "visits" && (
-            <VisitsPage
-              filters={visitFilters}
-              onFiltersChange={(f) => {
-                setVisitFilters(f);
-                setVisitPage(1);
-              }}
-              onReset={() => {
-                setVisitFilters(DEFAULT_VISIT_FILTERS);
-                setVisitPage(1);
-              }}
-              page={visitPage}
-              pageSize={visitPageSize}
-              onPageChange={setVisitPage}
-              onPageSizeChange={(size) => {
-                setVisitPageSize(size);
-                setVisitPage(1);
-              }}
-              onSelectRecord={setSelectedRecord}
-            />
-          )}
+            {page === "visits" && (
+              <VisitsPage
+                filters={visitFilters}
+                onFiltersChange={(f) => {
+                  setVisitFilters(f);
+                  setVisitPage(1);
+                }}
+                onReset={() => {
+                  setVisitFilters(DEFAULT_VISIT_FILTERS);
+                  setVisitPage(1);
+                }}
+                page={visitPage}
+                pageSize={visitPageSize}
+                onPageChange={setVisitPage}
+                onPageSizeChange={(size) => {
+                  setVisitPageSize(size);
+                  setVisitPage(1);
+                }}
+                onSelectRecord={setSelectedRecord}
+              />
+            )}
 
-          {page === "students" && (
-            <StudentsPage
-              filters={studentFilters}
-              onFiltersChange={setStudentFilters}
-              onReset={() => setStudentFilters(DEFAULT_STUDENT_FILTERS)}
-            />
-          )}
+            {page === "students" && (
+              <StudentsPage
+                filters={studentFilters}
+                onFiltersChange={setStudentFilters}
+                onReset={() => setStudentFilters(DEFAULT_STUDENT_FILTERS)}
+              />
+            )}
 
-          {page === "settings" && <SettingsPage />}
+            {page === "approval" && <StudentApprovalPage />}
+
+            {page === "settings" && <SettingsPage />}
+          </div>
         </main>
       </div>
 

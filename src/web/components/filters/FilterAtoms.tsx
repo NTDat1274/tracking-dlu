@@ -1,5 +1,6 @@
 // src/web/components/filters/FilterAtoms.tsx
 import type { CameraOption, VisitStatus } from "../../../data/types";
+import { sanitizeSearchInput } from "../../../lib/supabase";
 
 export function DateRangeFilter({
   dateFrom,
@@ -134,7 +135,8 @@ export function SearchInput({
       type="search"
       aria-label="Tìm kiếm"
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      // [Task 5.1] Sanitize tai cho nhap de chan XSS truoc khi dua vao filter/query.
+      onChange={(e) => onChange(sanitizeSearchInput(e.target.value))}
       placeholder={placeholder}
       className="focus-ring w-full sm:w-56 rounded-md border border-border bg-card px-3 py-1.5 text-sm"
     />

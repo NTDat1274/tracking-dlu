@@ -217,7 +217,7 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
         <button
           type="button"
           onClick={handleOpenAdd}
-          className="focus-ring flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:opacity-90 shadow-sm transition-opacity"
+          className="focus-ring flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] shadow-sm transition-all duration-200 cursor-pointer"
         >
           <Plus size={16} className="shrink-0" />
           Thêm Sinh Viên Mới
@@ -245,14 +245,15 @@ export default function StudentsPage({ filters, onFiltersChange, onReset }: Stud
       ) : (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-[repeat(auto-fill,minmax(300px,1fr))]">
-            {pageStudents.map((s) => (
+            {pageStudents.map((s, sIdx) => (
               <div
                 key={s.studentId}
                 onClick={() => setSelectedId(s.studentId)}
-                className={`group flex flex-col justify-between h-full rounded-2xl border bg-card p-4 transition-all duration-200 cursor-pointer ${
+                style={{ animationDelay: `${(sIdx % 12) * 55}ms` }}
+                className={`group flex flex-col justify-between h-full rounded-2xl border bg-card p-4 transition-all duration-200 ease-out cursor-pointer animate-item-enter ${
                   selectedId === s.studentId
-                    ? "border-primary ring-2 ring-primary/40 bg-primary/5"
-                    : "border-border hover:border-primary/50 hover:shadow-md"
+                    ? "border-primary ring-2 ring-primary/40 bg-primary/5 shadow-md"
+                    : "border-border hover:border-primary/50 hover:shadow-md hover:scale-[1.01]"
                 }`}
               >
                 <div>

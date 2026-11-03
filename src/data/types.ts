@@ -94,6 +94,29 @@ export interface Lecturer {
   created_at?: string;
 }
 
+/**
+ * Pending student record stored in the `pending_students` Supabase table.
+ * Used by Task 4.1 — the student self-service portal submits a webcam
+ * snapshot together with MSSV / Họ tên / Lớp and an admin must Approve
+ * (or Reject) the record before it is promoted to the main `students` table.
+ */
+export type PendingStudentStatus = "pending" | "approved" | "rejected";
+
+export interface PendingStudentRecord {
+  id: string;
+  student_id: string;
+  full_name: string;
+  class_name?: string | null;
+  email?: string | null;
+  portrait_url: string;
+  status: PendingStudentStatus;
+  submitted_by?: string | null;
+  reviewed_by?: string | null;
+  review_note?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export function isWaitingTooLong(
   status: VisitStatus | undefined,
   waitSeconds: number | undefined,

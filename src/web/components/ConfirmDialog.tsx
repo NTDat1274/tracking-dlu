@@ -57,9 +57,9 @@ export default function ConfirmDialog({
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
-      className="m-auto rounded-lg border border-border bg-card p-0 shadow-xl backdrop:bg-black/40"
+      className="m-auto rounded-2xl border border-border bg-card p-0 shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-sm open:animate-modal-zoom"
     >
-      <div onClick={(e) => e.stopPropagation()} className="w-[85vw] max-w-[360px] p-5">
+      <div onClick={(e) => e.stopPropagation()} className="w-[85vw] max-w-[360px] p-5 animate-modal-zoom">
         <h2 id="confirm-dialog-title" className="font-display text-base font-semibold text-foreground">
           {title}
         </h2>
@@ -69,7 +69,7 @@ export default function ConfirmDialog({
           <button
             type="button"
             onClick={handleClose}
-            className="focus-ring rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted"
+            className="focus-ring rounded-xl border border-border px-3.5 py-1.5 text-sm hover:bg-muted hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer"
           >
             Hủy
           </button>
@@ -79,7 +79,11 @@ export default function ConfirmDialog({
               onConfirm();
               handleClose();
             }}
-            className={`focus-ring rounded-md px-3 py-1.5 text-sm font-medium text-white ${danger ? "bg-offline hover:bg-red-700" : "bg-primary hover:bg-blue-700"}`}
+            className={`focus-ring rounded-xl px-3.5 py-1.5 text-sm font-semibold transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-sm ${
+              danger
+                ? "bg-offline text-white hover:bg-offline/90"
+                : "bg-primary text-primary-foreground hover:bg-primary/90"
+            }`}
           >
             {confirmLabel}
           </button>

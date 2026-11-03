@@ -73,10 +73,17 @@ export default function DataTable<T>({
                   onRowClick(row);
                 }
               }}
-              className={`border-b border-border-subtle last:border-0 ${i % 2 === 1 ? "bg-muted/40" : ""} ${onRowClick ? "cursor-pointer hover:bg-primary/5 focus-visible:bg-primary/5 focus-visible:outline-hidden" : ""}`}
+              style={{ animationDelay: `${Math.min(i * 50, 500)}ms` }}
+              className={`border-b border-border-subtle last:border-0 transition-colors duration-200 ease-out animate-item-enter ${
+                i % 2 === 1 ? "bg-muted/30" : "bg-card"
+              } ${
+                onRowClick
+                  ? "cursor-pointer hover:bg-primary/10 focus-visible:bg-primary/10 focus-visible:outline-hidden active:bg-primary/15"
+                  : "hover:bg-muted/50"
+              }`}
             >
               {columns.map((col) => (
-                <td key={col.key} className={`px-3 py-2.5 ${col.className ?? ""}`}>
+                <td key={col.key} className={`px-3.5 py-3 transition-colors ${col.className ?? ""}`}>
                   {col.render(row)}
                 </td>
               ))}

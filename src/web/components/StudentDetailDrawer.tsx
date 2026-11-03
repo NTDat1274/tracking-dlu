@@ -39,13 +39,13 @@ export default function StudentDetailDrawer({
     <div className="fixed inset-0 z-50 overflow-hidden" role="dialog" aria-modal="true">
       {/* Backdrop overlay with smooth blur */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-xs transition-opacity duration-300"
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 animate-fade-in"
         onClick={onClose}
         aria-hidden="true"
       />
 
       <div className="absolute inset-y-0 right-0 flex max-w-full">
-        <aside className="w-[92vw] max-w-[560px] transform bg-card shadow-2xl transition-transform duration-300 flex flex-col h-full border-l border-border animate-fade-in-up">
+        <aside className="w-[92vw] max-w-[560px] bg-card shadow-2xl flex flex-col h-full border-l border-border animate-drawer-right">
           {/* Drawer Top Header */}
           <div className="flex items-center justify-between border-b border-border px-6 py-4 shrink-0 bg-card">
             <div>

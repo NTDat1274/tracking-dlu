@@ -165,23 +165,27 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
       {/* 4 KPI Cards with DLU Brand Accents */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
+          index={0}
           label="Tổng lượt đến hôm nay"
           value={String(totalVisitsToday)}
           sub="Hệ thống camera ghi nhận"
           accent="#9ABE26"
         />
         <KpiCard
+          index={1}
           label="Đang có mặt trong phòng"
           value={String(currentOccupants.length)}
           sub="Realtime Occupants"
           accent="#FFC600"
         />
         <KpiCard
+          index={2}
           label="Thời gian ở trung bình"
           value={fmtDuration(avgDuration)}
           sub="Tính theo từng phiên ra/vào"
         />
         <KpiCard
+          index={3}
           label="Tỷ lệ tiếp nhận & phục vụ"
           value={`${serviceRate}%`}
           sub={`${servedRecords.length}/${totalVisits} lượt đã tiếp nhận`}
@@ -190,11 +194,11 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
       </div>
 
       {/* Realtime Occupants Table (Đang có mặt trong phòng kèm live stopwatch) */}
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-xs animate-item-enter transition-all duration-200" style={{ animationDelay: "180ms" }}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2.5">
             <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+              <span className="animate-heartbeat-glow absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-secondary"></span>
             </span>
             <div>
@@ -210,7 +214,7 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
           <button
             type="button"
             onClick={onViewWaitingList}
-            className="focus-ring flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            className="focus-ring flex items-center gap-1 text-xs font-semibold text-primary hover:underline hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
           >
             Xem danh sách chờ <ArrowRight size={14} className="inline -mt-0.5" />
           </button>
@@ -234,7 +238,7 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
-                {currentOccupants.slice(0, 5).map((occ) => {
+                {currentOccupants.slice(0, 5).map((occ, occIdx) => {
                   const entryTime = new Date(occ.enteredAt).getTime();
                   const liveSeconds = Math.max(0, Math.floor((currentTime - entryTime) / 1000));
 
@@ -242,7 +246,8 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
                     <tr
                       key={occ.id}
                       onClick={() => onSelectRecord?.(occ)}
-                      className="hover:bg-muted/30 cursor-pointer transition-colors"
+                      style={{ animationDelay: `${occIdx * 60}ms` }}
+                      className="hover:bg-primary/8 cursor-pointer transition-colors duration-150 animate-item-enter"
                     >
                       <td className="py-2.5">
                         <div className="flex items-center gap-2.5">
@@ -291,14 +296,15 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
       {/* Recent Activities & Charts Grid */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {/* Recent Activities */}
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-xs animate-item-enter" style={{ animationDelay: "280ms" }}>
           <h2 className="mb-3 font-display text-sm font-bold text-foreground">Hoạt động vào/ra gần nhất</h2>
-          <ul className="space-y-3">
-            {recentActivities.map((r) => (
+          <ul className="space-y-2.5">
+            {recentActivities.map((r, rIdx) => (
               <li
                 key={r.id}
                 onClick={() => onSelectRecord?.(r)}
-                className="flex items-center justify-between rounded-xl border border-border/50 bg-background/40 p-2.5 hover:border-primary/40 cursor-pointer transition-colors"
+                style={{ animationDelay: `${rIdx * 50}ms` }}
+                className="flex items-center justify-between rounded-xl border border-border/50 bg-background/40 p-2.5 hover:border-primary/40 hover:scale-[1.01] hover:bg-background/80 cursor-pointer transition-all duration-200 animate-item-enter"
               >
                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   <StudentAvatar src={r.avatarUrl} name={r.studentName} size="sm" />
@@ -318,7 +324,7 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
         </div>
 
         {/* Weekly Trend BarChart */}
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-xs animate-item-enter" style={{ animationDelay: "380ms" }}>
           <h2 className="mb-3 font-display text-sm font-bold text-foreground">Xu hướng tuần (DLU Green)</h2>
           <BarChart
             data={weeklyData}
@@ -327,11 +333,11 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
         </div>
 
         {/* System Diagnostics */}
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-xs animate-item-enter" style={{ animationDelay: "480ms" }}>
           <h2 className="mb-3 font-display text-sm font-bold text-foreground">Trạng thái kết nối</h2>
           <ul className="space-y-2.5 text-xs">
             {cameras.map((cam) => (
-              <li key={cam.id} className="flex items-center justify-between py-1">
+              <li key={cam.id} className="flex items-center justify-between py-1 transition-colors hover:text-primary">
                 <span className="text-foreground">{cam.id} - {cam.label}</span>
                 <StatusBadge status={cam.status || "Connected"} />
               </li>
@@ -342,11 +348,11 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
                 <StatusBadge status="Offline" />
               </li>
             )}
-            <li className="flex items-center justify-between py-1">
+            <li className="flex items-center justify-between py-1 transition-colors hover:text-primary">
               <span className="text-foreground">Supabase PostgreSQL</span>
               <StatusBadge status={getCloudConfig().supabaseUrl ? "Connected" : "Offline"} />
             </li>
-            <li className="flex items-center justify-between py-1">
+            <li className="flex items-center justify-between py-1 transition-colors hover:text-primary">
               <span className="text-foreground">Cloudinary Storage</span>
               <StatusBadge status={getCloudConfig().cloudinaryCloudName ? "Connected" : "Offline"} />
             </li>
@@ -355,7 +361,7 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
       </div>
 
       {/* Status Breakdown Bar */}
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-xs">
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-xs animate-item-enter" style={{ animationDelay: "580ms" }}>
         <h2 className="mb-3 font-display text-sm font-bold text-foreground">Phân loại 3 trạng thái chuẩn</h2>
         <div className="flex flex-wrap gap-4 text-xs">
           {[
@@ -372,7 +378,7 @@ export default function OverviewPage({ onViewWaitingList, onSelectRecord }: Over
                 </div>
                 <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full rounded-full transition-all duration-500"
+                    className="h-full rounded-full transition-all duration-700 ease-out"
                     style={{ width: `${pct}%`, backgroundColor: s.color }}
                   />
                 </div>

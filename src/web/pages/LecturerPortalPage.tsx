@@ -52,9 +52,10 @@ interface LecturerPortalPageProps {
 type TabType = "profile" | "history";
 
 /**
- * Cấu trúc hồ sơ giảng viên lưu local — dự phòng trước khi bảng `lecturers`
- * được tạo chính thức trên Supabase ở Task 1.4. Khi bảng lecturers tồn tại,
- * ta vẫn giữ localStorage làm cache fallback khi offline.
+ * Cau truc ho so giang vien luu RAM-ONLY (Task 5.1).
+ * [Task 5.1] TUYET DOI KHONG dung localStorage/sessionStorage/Cookies de luu
+ * thong tin nhay cam. Map RAM nay chi ton tai trong phien lam viec va tu dong
+ * bien mat hoan toan khi F5 hoac dong tab.
  */
 interface LecturerLocalProfile {
   lecturer_code: string;
@@ -65,7 +66,9 @@ interface LecturerLocalProfile {
   updated_at: string;
 }
 
-const LECTURER_PROFILE_STORAGE_KEY = "trackingz_lecturer_profiles";
+const LECTURER_PROFILE_CACHE_KEY_UNUSED = "trackingz_lecturer_profiles";
+// [Task 5.1] RAM-only cache cho ho so giang vien (khong persist xuong dia).
+const lecturerProfileRamCache = new Map<string, LecturerLocalProfile>();
 
 const DEPARTMENT_SUGGESTIONS = [
   "Khoa Công nghệ thông tin",
@@ -80,26 +83,28 @@ const DEPARTMENT_SUGGESTIONS = [
 ];
 
 function readLocalProfiles(): Record<string, LecturerLocalProfile> {
+  // [Task 5.1] Chi doc tu RAM (khong doc localStorage de tranh ro ri du lieu).
+  void LECTURER_PROFILE_CACHE_KEY_UNUSED;
   if (typeof window === "undefined") return {};
   try {
-    const raw = localStorage.getItem(LECTURER_PROFILE_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? (parsed as Record<string, LecturerLocalProfile>) : {};
+    const out: Record<string, LecturerLocalProfile> = {};
+    lecturerProfileRamCache.forEach((profile, userId) => {
+      out[userId] = profile;
+    });
+    return out;
   } catch (err) {
-    console.warn("Không thể đọc lecturer profile từ localStorage:", err);
+    console.warn("Không thể đọc lecturer profile từ RAM cache:", err);
     return {};
   }
 }
 
 function writeLocalProfile(userId: string, profile: LecturerLocalProfile): void {
+  // [Task 5.1] Chi ghi vao RAM (tu mat khi F5/close tab).
   if (typeof window === "undefined") return;
   try {
-    const all = readLocalProfiles();
-    all[userId] = profile;
-    localStorage.setItem(LECTURER_PROFILE_STORAGE_KEY, JSON.stringify(all));
+    lecturerProfileRamCache.set(userId, profile);
   } catch (err) {
-    console.warn("Không thể ghi lecturer profile vào localStorage:", err);
+    console.warn("Không thể ghi lecturer profile vào RAM cache:", err);
   }
 }
 
@@ -444,7 +449,7 @@ export default function LecturerPortalPage({ onBackToAdmin }: LecturerPortalPage
             role="tab"
             aria-selected={activeTab === "profile"}
             onClick={() => setActiveTab("profile")}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold transition-all cursor-pointer ${
+            className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold transition-all duration-200 hover:scale-[1.01] active:scale-[0.98] cursor-pointer ${
               activeTab === "profile"
                 ? "bg-card text-foreground shadow-sm ring-1 ring-border"
                 : "text-muted-foreground hover:text-foreground"
@@ -458,7 +463,7 @@ export default function LecturerPortalPage({ onBackToAdmin }: LecturerPortalPage
             role="tab"
             aria-selected={activeTab === "history"}
             onClick={() => setActiveTab("history")}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold transition-all cursor-pointer ${
+            className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold transition-all duration-200 hover:scale-[1.01] active:scale-[0.98] cursor-pointer ${
               activeTab === "history"
                 ? "bg-card text-foreground shadow-sm ring-1 ring-border"
                 : "text-muted-foreground hover:text-foreground"
@@ -471,7 +476,7 @@ export default function LecturerPortalPage({ onBackToAdmin }: LecturerPortalPage
 
         {/* TAB 1: PROFILE & AI PORTRAIT */}
         {activeTab === "profile" && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-fade-in">
+          <div key="profile" className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start animate-page-enter">
             {/* Left column: Portrait Upload */}
             <div className="lg:col-span-5 rounded-2xl border border-border bg-card p-5 sm:p-6 shadow-sm space-y-5">
               <div className="border-b border-border/60 pb-3">
@@ -679,7 +684,7 @@ export default function LecturerPortalPage({ onBackToAdmin }: LecturerPortalPage
 
         {/* TAB 2: READ-ONLY VISIT HISTORY */}
         {activeTab === "history" && (
-          <div className="space-y-6 animate-fade-in">
+          <div key="history" className="space-y-6 animate-page-enter">
             {/* Read-only notice */}
             <div className="rounded-xl border border-primary/30 bg-primary/5 p-3.5 text-xs text-primary flex items-start gap-2">
               <Eye size={16} className="shrink-0 mt-0.5" />

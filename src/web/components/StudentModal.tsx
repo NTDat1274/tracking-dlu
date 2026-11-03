@@ -1,10 +1,14 @@
 // src/web/components/StudentModal.tsx
-// Modal for adding or editing a student with Cloudinary portrait upload and Supabase save.
+// Modal for adding or editing a student with Webcam portrait capture (Task 4.1)
+// + Supabase submission. File uploads have been disabled by design — every
+// snapshot must come from `getUserMedia` so admins can guarantee consistent
+// face-on, well-lit portraits before they reach the AI pipeline.
 import React, { useState } from "react";
 import { uploadImageToCloudinary } from "../../lib/cloudinary";
-import { upsertStudent } from "../../lib/supabase";
+import { upsertStudent, submitPendingStudent } from "../../lib/supabase";
 import { StudentAvatar } from "./AvatarFallback";
-import { X } from "lucide-react";
+import WebcamCapture from "./WebcamCapture";
+import { Hourglass, X } from "lucide-react";
 
 export interface StudentFormData {
   student_id: string;
@@ -19,17 +23,33 @@ interface StudentModalProps {
   initialData?: StudentFormData | null;
   onClose: () => void;
   onSuccess: (saved: StudentFormData) => void;
+  /**
+   * When true (default for the "Thêm sinh viên" Admin flow) the form
+   * writes into the staging `pending_students` table instead of
+   * `upsertStudent`. Required by Task 4.1 — the new-student path
+   * must always route through the Admin approval queue.
+   */
+  requireApproval?: boolean;
+  /** Caller-provided callback fired after a successful pending submission
+   *  so the parent (e.g. the approval page) can refresh immediately. */
+  onSubmittedPending?: (saved: StudentFormData) => void;
+}
+
+interface StudentModalFormBodyProps {
+  initialData?: StudentFormData | null;
+  onClose: () => void;
+  onSuccess: (saved: StudentFormData) => void;
+  requireApproval: boolean;
+  onSubmittedPending?: (saved: StudentFormData) => void;
 }
 
 function StudentModalForm({
   initialData,
   onClose,
   onSuccess,
-}: {
-  initialData?: StudentFormData | null;
-  onClose: () => void;
-  onSuccess: (saved: StudentFormData) => void;
-}) {
+  requireApproval,
+  onSubmittedPending,
+}: StudentModalFormBodyProps) {
   const [formData, setFormData] = useState<StudentFormData>(() => ({
     student_id: initialData?.student_id || "",
     full_name: initialData?.full_name || "",
@@ -38,26 +58,30 @@ function StudentModalForm({
     portrait_url: initialData?.portrait_url || "",
   }));
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  // Task 4.1: file `<input type="file">` đã bị KHOÁ hoàn toàn. Ảnh chỉ
+  // đến từ component `WebcamCapture` dưới dạng Blob + data URL.
+  const [webcamBlob, setWebcamBlob] = useState<Blob | null>(null);
+  const [webcamPreviewUrl, setWebcamPreviewUrl] = useState<string>("");
   const [previewUrl, setPreviewUrl] = useState<string>(() => initialData?.portrait_url || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
+  const [submittedToQueue, setSubmittedToQueue] = useState(false);
 
   const isEditing = Boolean(initialData?.student_id);
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith("image/")) {
-        setErrorMsg("Vui lòng chọn file hình ảnh (JPG, PNG, WEBP).");
-        return;
-      }
-      setSelectedFile(file);
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-      setErrorMsg("");
-    }
-  }
+  const handleWebcamCapture = ({ blob, dataUrl }: { blob: Blob; dataUrl: string }) => {
+    setWebcamBlob(blob);
+    setWebcamPreviewUrl(dataUrl);
+    setPreviewUrl(dataUrl);
+    setErrorMsg("");
+  };
+
+  const handleWebcamReset = () => {
+    setWebcamBlob(null);
+    setWebcamPreviewUrl("");
+    setPreviewUrl(formData.portrait_url || "");
+    setErrorMsg("");
+  };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -71,14 +95,23 @@ function StudentModalForm({
       setErrorMsg("Vui lòng nhập Họ tên sinh viên.");
       return;
     }
+    if (!webcamBlob && !formData.portrait_url) {
+      setErrorMsg(
+        "Vui lòng bật Webcam chụp ảnh khuôn mặt trước khi lưu hồ sơ.",
+      );
+      return;
+    }
 
     setIsSubmitting(true);
     let uploadedUrl = formData.portrait_url;
 
-    // 1. Upload photo to Cloudinary if a new file was chosen
-    if (selectedFile) {
+    // 1. Upload ảnh chụp Webcam lên Cloudinary (nếu có frame mới)
+    if (webcamBlob) {
       try {
-        const uploadRes = await uploadImageToCloudinary(selectedFile);
+        const file = new File([webcamBlob], "webcam-portrait.jpg", {
+          type: "image/jpeg",
+        });
+        const uploadRes = await uploadImageToCloudinary(file);
         if (uploadRes.success && uploadRes.url) {
           uploadedUrl = uploadRes.url;
         } else {
@@ -93,14 +126,42 @@ function StudentModalForm({
       }
     }
 
-    // 2. Save student record to Supabase
-    const payload = {
+    // 2. Tạo payload chung
+    const payload: StudentFormData = {
       student_id: formData.student_id.trim(),
       full_name: formData.full_name.trim(),
       class_name: formData.class_name.trim(),
       email: formData.email.trim(),
       portrait_url: uploadedUrl,
     };
+
+    // 3. Theo Task 4.1: với sinh viên mới và ở chế độ yêu cầu duyệt,
+    //    ghi vào `pending_students` (status='pending') thay vì upsert
+    //    trực tiếp. Ngược lại (đang edit), giữ hành vi cũ để tương
+    //    thích với luồng chỉnh sửa đã có.
+    if (requireApproval && !isEditing) {
+      const res = await submitPendingStudent({
+        student_id: payload.student_id,
+        full_name: payload.full_name,
+        class_name: payload.class_name,
+        email: payload.email,
+        portrait_url: payload.portrait_url,
+      });
+      setIsSubmitting(false);
+      if (res.success) {
+        setSubmittedToQueue(true);
+        onSubmittedPending?.(payload);
+        // Keep the modal open briefly so the user sees the success hint,
+        // then auto-close after a short delay (UX consistency).
+        setTimeout(() => {
+          onSuccess(payload);
+          onClose();
+        }, 1400);
+      } else {
+        setErrorMsg(res.error || "Không thể gửi hồ sơ chờ duyệt.");
+      }
+      return;
+    }
 
     const res = await upsertStudent(payload);
     setIsSubmitting(false);
@@ -114,7 +175,7 @@ function StudentModalForm({
   }
 
   return (
-    <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl border border-border bg-card shadow-2xl animate-fade-in-up">
+    <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl border border-border bg-card shadow-2xl animate-modal-zoom">
       <div className="flex items-center justify-between border-b border-border/80 p-6 pb-4 shrink-0">
         <div>
           <h2 className="font-display text-lg font-bold text-foreground">
@@ -141,8 +202,20 @@ function StudentModalForm({
         </div>
       ) : null}
 
+      {submittedToQueue && (
+        <div className="mt-4 flex items-start gap-2 rounded-lg border border-online/40 bg-online/10 p-3 text-xs text-online">
+          <Hourglass size={14} className="shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold">Đã gửi hồ sơ vào bảng chờ duyệt.</p>
+            <p className="mt-0.5 text-[11px]">
+              Quản trị viên sẽ xem xét và duyệt ảnh Webcam trên trang "Phê duyệt hồ sơ".
+            </p>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-        {/* Portrait Photo Upload & Preview */}
+        {/* Portrait Photo via WebcamCapture (Task 4.1) */}
         <div className="rounded-xl border border-border/70 bg-background/50 p-4">
           <label className="block text-xs font-semibold text-foreground mb-2">
             Ảnh chân dung (Portrait / Nhận diện khuôn mặt)
@@ -156,23 +229,27 @@ function StudentModalForm({
             />
 
             <div className="flex-1">
-              <input
-                type="file"
-                id="portrait-file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              <label
-                htmlFor="portrait-file"
-                className="focus-ring inline-block cursor-pointer rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/20 transition-colors"
-              >
-                {previewUrl ? "Thay đổi ảnh..." : "Chọn ảnh từ máy..."}
-              </label>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Ảnh mặt trực diện, rõ nét, định dạng JPG/PNG. Sẽ tự động tải lên Cloudinary.
-              </p>
+              {/* KHÔNG còn `<input type="file">` ở đây — đã bị khoá. */}
+              {previewUrl && !webcamPreviewUrl && (
+                <p className="text-[11px] text-muted-foreground">
+                  Ảnh chân dung hiện tại đã được lưu trước đó. Bạn có thể chụp lại ảnh Webcam bên dưới để thay thế.
+                </p>
+              )}
+              {!previewUrl && !webcamPreviewUrl && (
+                <p className="text-[11px] text-muted-foreground">
+                  Bật Webcam và chụp ảnh khuôn mặt trực diện để hệ thống AI nhận diện.
+                </p>
+              )}
             </div>
+          </div>
+
+          <div className="mt-3">
+            <WebcamCapture
+              onCapture={handleWebcamCapture}
+              onReset={handleWebcamReset}
+              compact
+              fileUploadDisabled
+            />
           </div>
         </div>
 
@@ -242,17 +319,23 @@ function StudentModalForm({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="focus-ring rounded-lg border border-border px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="focus-ring rounded-xl border border-border px-4 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground hover:scale-[1.01] active:scale-[0.98] transition-all duration-200 cursor-pointer"
           >
             Hủy
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="focus-ring flex items-center gap-2 rounded-lg bg-primary px-5 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-opacity"
+            className="focus-ring flex items-center gap-2 rounded-xl bg-primary px-5 py-2 text-xs font-bold text-primary-foreground hover:opacity-90 hover:scale-[1.01] active:scale-[0.98] shadow-sm disabled:opacity-50 transition-all duration-200 cursor-pointer"
           >
             {isSubmitting ? <span className="h-3 w-3 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" /> : null}
-            {isSubmitting ? "Đang xử lý & Tải ảnh..." : isEditing ? "Lưu thay đổi" : "Lưu sinh viên"}
+            {isSubmitting
+              ? "Đang xử lý & Tải ảnh..."
+              : isEditing
+              ? "Lưu thay đổi"
+              : requireApproval
+              ? "Gửi Admin phê duyệt"
+              : "Lưu sinh viên"}
           </button>
         </div>
       </form>
@@ -266,19 +349,23 @@ export default function StudentModal({
   initialData,
   onClose,
   onSuccess,
+  requireApproval = true,
+  onSubmittedPending,
 }: StudentModalProps) {
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-xs" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 animate-fade-in cursor-pointer" onClick={onClose} />
 
       <StudentModalForm
         key={initialData ? initialData.student_id : "new_student"}
         initialData={initialData}
         onClose={onClose}
         onSuccess={onSuccess}
+        requireApproval={requireApproval}
+        onSubmittedPending={onSubmittedPending}
       />
     </div>
   );

@@ -81,8 +81,8 @@ export default function CameraHeartbeatMonitor({
           >
             {onlineCount > 0 && (
               <>
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                <span className="animate-heartbeat-glow absolute inline-flex h-full w-full rounded-full bg-primary/50"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-primary shadow-xs"></span>
               </>
             )}
             {onlineCount === 0 && (
@@ -99,10 +99,10 @@ export default function CameraHeartbeatMonitor({
           </div>
         </div>
         <div className="flex items-center gap-1.5 text-[11px] font-semibold">
-          <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-primary border border-primary/40">
+          <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-0.5 text-primary border border-primary/40 transition-all duration-200 hover:scale-[1.02]">
             <Wifi size={12} /> {onlineCount} Online
           </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-offline/15 px-2 py-0.5 text-offline border border-offline/40">
+          <span className="inline-flex items-center gap-1 rounded-full bg-offline/15 px-2.5 py-0.5 text-offline border border-offline/40 transition-all duration-200 hover:scale-[1.02]">
             <WifiOff size={12} /> {offlineCount} Offline
           </span>
         </div>
@@ -117,30 +117,31 @@ export default function CameraHeartbeatMonitor({
           Chưa có camera nào đăng ký trong hệ thống.
         </div>
       ) : (
-        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {enriched.map((cam) => (
+        <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          {enriched.map((cam, idx) => (
             <li
               key={cam.id}
-              className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 transition-colors ${
+              style={{ animationDelay: `${idx * 40}ms` }}
+              className={`flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 transition-all duration-200 ease-out hover:scale-[1.01] hover:shadow-xs animate-item-enter ${
                 cam.isOnline
-                  ? "border-primary/30 bg-primary/5"
-                  : "border-offline/30 bg-offline/5"
+                  ? "border-primary/30 bg-primary/5 hover:border-primary/50"
+                  : "border-offline/30 bg-offline/5 hover:border-offline/50"
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                {/* LED indicator: blinks green when online, solid red when offline */}
+                {/* LED indicator: smooth glowing green when online, solid red when offline */}
                 <span
                   aria-label={cam.isOnline ? "Online" : "Offline"}
                   title={cam.isOnline ? "Online" : "Offline"}
-                  className="relative flex h-3 w-3 shrink-0"
+                  className="relative flex h-3 w-3 shrink-0 items-center justify-center"
                 >
                   {cam.isOnline ? (
                     <>
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
+                      <span className="animate-heartbeat-glow absolute inline-flex h-full w-full rounded-full bg-primary/50"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
                     </>
                   ) : (
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-offline"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-offline"></span>
                   )}
                 </span>
 

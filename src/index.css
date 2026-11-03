@@ -168,13 +168,158 @@ html.light,
     to { opacity: 1; transform: translateY(0); }
   }
 
+  @keyframes page-enter {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes item-enter {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes modal-zoom {
+    from {
+      opacity: 0;
+      transform: scale(0.96) translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  @keyframes drawer-slide-right {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes drawer-slide-left {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-5px); }
+    40%, 80% { transform: translateX(5px); }
+  }
+
+  @keyframes success-pop {
+    0% {
+      transform: scale(0.8);
+      opacity: 0;
+    }
+    60% {
+      transform: scale(1.06);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes progress-fill {
+    from {
+      width: 0%;
+    }
+    to {
+      width: 100%;
+    }
+  }
+
+  @keyframes heartbeat-glow {
+    0% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 rgba(154, 190, 38, 0.7);
+      opacity: 0.85;
+    }
+    70% {
+      transform: scale(1.2);
+      box-shadow: 0 0 0 6px rgba(154, 190, 38, 0);
+      opacity: 0;
+    }
+    100% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 rgba(154, 190, 38, 0);
+      opacity: 0;
+    }
+  }
+
   @keyframes pulse-subtle {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }
   }
 
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .animate-page-enter {
+    animation: page-enter 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    will-change: opacity, transform;
+  }
+
+  .animate-item-enter {
+    animation: item-enter 0.75s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .animate-modal-zoom {
+    animation: modal-zoom 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-drawer-right {
+    animation: drawer-slide-right 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-drawer-left {
+    animation: drawer-slide-left 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-shake {
+    animation: shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  }
+
+  .animate-success-pop {
+    animation: success-pop 0.65s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+  }
+
+  .animate-progress-fill {
+    animation: progress-fill 1.2s ease-in-out forwards;
+  }
+
+  .animate-heartbeat-glow {
+    animation: heartbeat-glow 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
   .animate-fade-in-up {
-    animation: fade-in-up 0.2s ease-out forwards;
+    animation: fade-in-up 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
 
   .animate-skeleton {

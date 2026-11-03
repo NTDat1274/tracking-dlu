@@ -190,7 +190,7 @@ export default function VisitsPage({
               e.stopPropagation();
               onSelectRecord(r);
             }}
-            className="focus-ring flex items-center justify-center rounded-md border border-primary/40 bg-primary/10 p-1 text-primary hover:bg-primary/20 transition-colors h-[26px] w-[26px]"
+            className="focus-ring flex items-center justify-center rounded-lg border border-primary/40 bg-primary/10 p-1 text-primary hover:bg-primary/20 hover:scale-105 active:scale-95 transition-all duration-150 h-[26px] w-[26px] cursor-pointer"
           >
             <Eye size={14} />
           </button>
@@ -201,7 +201,7 @@ export default function VisitsPage({
               e.stopPropagation();
               setDeleteCandidate(r);
             }}
-            className="focus-ring flex items-center justify-center rounded-md border border-offline/40 bg-offline/10 p-1 text-offline hover:bg-offline/20 transition-colors h-[26px] w-[26px]"
+            className="focus-ring flex items-center justify-center rounded-lg border border-offline/40 bg-offline/10 p-1 text-offline hover:bg-offline/20 hover:scale-105 active:scale-95 transition-all duration-150 h-[26px] w-[26px] cursor-pointer"
           >
             <Trash2 size={14} />
           </button>
